@@ -8,7 +8,9 @@ package net.dries007.tfc.data.providers;
 
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
@@ -52,13 +54,25 @@ public class BuiltinItemSizes extends DataManagerProvider<ItemSizeDefinition> im
         add("chests", Tags.Items.CHESTS, Size.LARGE, Weight.LIGHT);
         add("ingots", DifferenceIngredient.of(Ingredient.of(Tags.Items.INGOTS), Ingredient.of(Tags.Items.BRICKS)), Size.LARGE, Weight.MEDIUM);
         add("double_ingots", TFCTags.Items.DOUBLE_INGOTS, Size.LARGE, Weight.MEDIUM);
-        add("sheets", TFCTags.Items.SHEETS, Size.LARGE, Weight.MEDIUM);
-        add("double_sheets", TFCTags.Items.DOUBLE_SHEETS, Size.LARGE, Weight.MEDIUM);
+        add("plates", TFCTags.Items.SHEETS, Size.LARGE, Weight.MEDIUM);
+        add("double_plates", TFCTags.Items.DOUBLE_SHEETS, Size.LARGE, Weight.MEDIUM);
+        add("sheets", TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "sheets")), Size.LARGE, Weight.MEDIUM);
+        add("double_sheets", TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "double_sheets")), Size.LARGE, Weight.MEDIUM);
         add("rods", Tags.Items.RODS, Size.NORMAL, Weight.LIGHT);
         add("dyes", Tags.Items.DYES, Size.TINY, Weight.LIGHT);
         add("foods", Tags.Items.FOODS, Size.SMALL, Weight.LIGHT);
+        add("doughs", commonTagOf(Registries.ITEM, "doughs"), Size.SMALL, Weight.LIGHT);
+        add("flours", commonTagOf(Registries.ITEM, "flours"), Size.SMALL, Weight.LIGHT);
+        add("grains", commonTagOf(Registries.ITEM, "grains"), Size.SMALL, Weight.LIGHT);
+        add("seeds", Tags.Items.SEEDS, Size.TINY, Weight.LIGHT);
         add("dusts", Tags.Items.DUSTS, Size.VERY_SMALL, Weight.VERY_LIGHT);
         add("buckets", Tags.Items.BUCKETS, Size.LARGE, Weight.MEDIUM);
+        add("nuggets", Tags.Items.NUGGETS, Size.VERY_SMALL, Weight.VERY_LIGHT);
+        add("gems", Tags.Items.GEMS, Size.SMALL, Weight.LIGHT);
+        add("crops", Tags.Items.CROPS, Size.SMALL, Weight.LIGHT);
+        add("tool_heads", commonTagOf(Registries.ITEM, "tool_heads"), Size.LARGE, Weight.MEDIUM);
+        add("strings", commonTagOf(Registries.ITEM, "strings"), Size.VERY_SMALL, Weight.VERY_LIGHT);
+
 
         // TFC Tags
         add("quern", TFCBlocks.QUERN, Size.VERY_LARGE, Weight.MEDIUM);
