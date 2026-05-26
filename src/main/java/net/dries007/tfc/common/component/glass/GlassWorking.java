@@ -59,4 +59,10 @@ public final class GlassWorking
     {
         if (!stack.isEmpty()) stack.set(TFCComponents.GLASS, get(stack).with(glass));
     }
+
+    public static ItemStack createWithBatch(ItemStack stack, ItemStack glass)
+    {
+        createNewBatch(stack, glass);
+        return stack;
+    }
 }

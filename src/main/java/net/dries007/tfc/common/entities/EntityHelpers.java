@@ -35,7 +35,6 @@ import net.minecraft.world.item.MobBucketItem;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import net.dries007.tfc.common.entities.ai.TFCAvoidEntityGoal;
-import net.dries007.tfc.common.entities.livestock.Gender;
 import net.dries007.tfc.common.entities.livestock.TFCAnimalProperties;
 import net.dries007.tfc.common.fluids.FluidHelpers;
 import net.dries007.tfc.util.calendar.Calendars;

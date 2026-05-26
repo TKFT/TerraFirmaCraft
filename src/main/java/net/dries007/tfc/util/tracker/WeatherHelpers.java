@@ -427,7 +427,7 @@ public final class WeatherHelpers
             {
                 BlockPos posAbove = iciclePos.above();
                 BlockState stateAbove = level.getBlockState(posAbove);
-                if (Helpers.isBlock(stateAbove, BlockTags.ICE))
+                if (Helpers.isBlock(stateAbove, BlockTags.ICE) || Helpers.isBlock(stateAbove, TFCTags.Blocks.NO_ICICLE_GENERATION))
                 {
                     return;
                 }

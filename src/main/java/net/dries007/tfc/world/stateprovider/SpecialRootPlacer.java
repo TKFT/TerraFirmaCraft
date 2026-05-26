@@ -13,17 +13,13 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.feature.TreeFeature;
 
 import net.dries007.tfc.common.blocks.TFCBlocks;
 import net.dries007.tfc.common.fluids.FluidHelpers;
 import net.dries007.tfc.util.EnvironmentHelpers;
-import net.dries007.tfc.util.Helpers;
 import net.dries007.tfc.util.collections.IWeighted;
 import net.dries007.tfc.world.feature.tree.RootConfig;
 

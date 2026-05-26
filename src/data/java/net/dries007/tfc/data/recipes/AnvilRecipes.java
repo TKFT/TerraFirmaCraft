@@ -89,6 +89,7 @@ public interface AnvilRecipes extends Recipes
         anvil(Metal.HIGH_CARBON_RED_STEEL, Metal.RED_STEEL);
 
         anvil(ingredientOf(Metal.WROUGHT_IRON, ItemType.SHEET), ItemStackProvider.of(Blocks.IRON_DOOR), 3, false, DRAW_NOT_LAST, PUNCH_NOT_LAST, HIT_LAST);
+        anvil(ingredientOf(Metal.COPPER, ItemType.SHEET), ItemStackProvider.of(Blocks.COPPER_DOOR), 1, false, DRAW_NOT_LAST, PUNCH_NOT_LAST, HIT_LAST);
         anvil(ingredientOf(Metal.RED_STEEL, ItemType.SHEET), ItemStackProvider.of(TFCItems.RED_STEEL_BUCKET), 6, false, BEND_THIRD_LAST, BEND_SECOND_LAST, HIT_LAST);
         anvil(ingredientOf(Metal.BLUE_STEEL, ItemType.SHEET), ItemStackProvider.of(TFCItems.BLUE_STEEL_BUCKET), 6, false, BEND_THIRD_LAST, BEND_SECOND_LAST, HIT_LAST);
         anvil(ingredientOf(Metal.WROUGHT_IRON, ItemType.DOUBLE_SHEET), ItemStackProvider.of(TFCItems.WROUGHT_IRON_GRILL), 3, false, PUNCH_NOT_LAST, DRAW_ANY, PUNCH_LAST);

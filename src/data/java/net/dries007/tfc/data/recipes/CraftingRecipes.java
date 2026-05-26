@@ -68,6 +68,7 @@ public interface CraftingRecipes extends Recipes
             "bricks",
             "bucket",
             "campfire",
+            "copper_door",
             "chest",
             "minecart",
             "chest_minecart",
@@ -1002,9 +1003,13 @@ public interface CraftingRecipes extends Recipes
             .input(Items.CLAY_BALL)
             .shapeless(TFCItems.DAUB, 2);
         recipe().bricksWithMortar(TFCItems.FIRE_BRICK, TFCBlocks.FIRE_BRICKS, 4);
-        recipe()
+        recipe("from_iron")
             .input(TFCBlocks.FIRE_BRICKS)
             .input(ingredientOf(Metal.WROUGHT_IRON, Metal.ItemType.SHEET))
+            .shapeless(TFCBlocks.REINFORCED_FIRE_BRICKS);
+        recipe("from_steel")
+            .input(TFCBlocks.FIRE_BRICKS)
+            .input(ingredientOf(Metal.STEEL, Metal.ItemType.SHEET))
             .shapeless(TFCBlocks.REINFORCED_FIRE_BRICKS);
         recipe()
             .input(TFCItems.POWDERS.get(Powder.KAOLINITE), 4)

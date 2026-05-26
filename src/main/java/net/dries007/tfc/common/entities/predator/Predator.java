@@ -17,7 +17,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.AnimationState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
@@ -39,7 +38,6 @@ import org.jetbrains.annotations.Nullable;
 
 import net.dries007.tfc.client.TFCSounds;
 import net.dries007.tfc.client.particle.TFCParticles;
-import net.dries007.tfc.common.effect.TFCEffects;
 import net.dries007.tfc.common.entities.ai.TFCBrain;
 import net.dries007.tfc.common.entities.ai.predator.PredatorAi;
 import net.dries007.tfc.common.entities.prey.WildAnimal;

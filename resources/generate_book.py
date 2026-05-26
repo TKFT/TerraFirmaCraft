@@ -73,7 +73,7 @@ In addition, here's some useful things for dev work, and also making standardize
 from argparse import ArgumentParser
 from typing import Optional
 
-from constants import CROPS, METALS, FRUITS, BERRIES, GRAINS
+from constants import CROPS, METALS, FRUITS, BERRIES, GRAINS, ROCKS
 from patchouli import *
 
 GRADES = ['poor', 'normal', 'rich']  # Sorted so they appear in a nice order for animation
@@ -958,7 +958,7 @@ def make_book(rm: ResourceManager, i18n: I18n, local_instance: bool = False, rev
             page_break(),
             text('$(thing)Stone Bricks$() can be made using a $(l:mechanics/chisel)Chisel$() with some individual loose rocks. It then requires $(thing)Mortar$() in order to form a strong building block.$(br2)Mortar can be made by adding $(thing)Sand$() to a barrel of $(l:mechanics/barrels#limewater)Limewater$().', title='Bricks and Mortar').anchor('bricks_and_mortar'),
             crafting('tfc:crafting/brick/gneiss', 'tfc:crafting/rock/bricks/gneiss'),
-            text('Other decorative stone blocks can also be made, such as both $(thing)Cracked Bricks$(), and $(thing)Chiseled Stone$(). $(thing)Mossy$() stone blocks can also be created by placing cobblestone or bricks underwater, near existing mossy bricks or cobblestone. The moss will start to spread to these nearby blocks.'),
+            text('Other decorative stone blocks can also be made, such as both $(thing)Cracked Bricks$(), and $(thing)Chiseled Bricks$(). $(thing)Mossy$() stone blocks can also be created by placing cobblestone or bricks underwater, near existing mossy bricks or cobblestone. The moss will start to spread to these nearby blocks.').link(*['tfc:rock/chiseled/%s' % r for r in ROCKS], *['tfc:rock/cracked_bricks/%s' % r for r in ROCKS]),
             crafting('tfc:crafting/rock/chiseled/gneiss', 'tfc:crafting/rock/cracked_bricks/gneiss'),
         )),
         entry('salad', 'Salads', 'tfc:food/protein_salad', pages=(

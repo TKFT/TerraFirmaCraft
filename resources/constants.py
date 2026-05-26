@@ -988,6 +988,7 @@ DEFAULT_LANG = {
     'tfc.key.place_block': 'Place Block',
     'tfc.key.cycle_chisel_mode': 'Cycle Chisel Mode',
     'tfc.key.stack_food': 'Stack Food',
+    'glass.tfc.complete': 'Complete',
     'glass_operation.tfc.blow': 'Blow',
     'glass_operation.tfc.roll': 'Roll',
     'glass_operation.tfc.stretch': 'Stretch',

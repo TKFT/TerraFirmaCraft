@@ -20,7 +20,6 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import net.dries007.tfc.client.RenderHelpers;
-import net.dries007.tfc.common.entities.aquatic.AquaticMob;
 
 public class SimpleMobRenderer<T extends Mob, M extends EntityModel<T>> extends MobRenderer<T, M>
 {

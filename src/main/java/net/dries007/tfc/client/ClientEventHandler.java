@@ -45,7 +45,6 @@ import net.minecraft.client.renderer.entity.NoopRenderer;
 import net.minecraft.client.renderer.entity.OcelotRenderer;
 import net.minecraft.client.renderer.entity.PandaRenderer;
 import net.minecraft.client.renderer.entity.RabbitRenderer;
-import net.minecraft.client.renderer.entity.SalmonRenderer;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.component.DataComponentType;

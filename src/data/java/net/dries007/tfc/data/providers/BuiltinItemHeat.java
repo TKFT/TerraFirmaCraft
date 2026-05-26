@@ -141,6 +141,9 @@ public class BuiltinItemHeat extends DataManagerProvider<HeatDefinition> impleme
         addAndMeltIron(TFCItems.REFINED_IRON_BLOOM, 100);
         addAndMeltIron(TFCItems.WROUGHT_IRON_GRILL, 400);
         addAndMeltIron(Items.IRON_DOOR, 200);
+        addAndMeltIron(TFCBlocks.BLAST_FURNACE, 3200);
+        addAndMeltIron(TFCBlocks.FIREPROOF_DOOR, 600);
+        addAndMeltIron(TFCBlocks.STOVE, 1600);
 
         addAndMelt(Items.BELL, Metal.GOLD, 100);
         addAndMelt(TFCBlocks.BRONZE_BELL, Metal.BRONZE, 100);
@@ -149,6 +152,13 @@ public class BuiltinItemHeat extends DataManagerProvider<HeatDefinition> impleme
         addAndMelt(TFCItems.GEM_SAW, Metal.BRASS, 50);
         addAndMelt(TFCItems.JAR_LID, Metal.TIN, 6);
         addAndMelt(TFCItems.BRASS_MECHANISMS, Metal.BRASS, 50);
+        addAndMelt(TFCBlocks.STEEL_PIPE, Metal.STEEL, 25);
+        addAndMelt(TFCBlocks.ANEMOMETER, Metal.BRASS, 200);
+        addAndMelt(TFCBlocks.CRANKSHAFT, Metal.BRASS, 250);
+        addAndMelt(TFCBlocks.CALENDAR_CLOCK, Metal.BRASS,500);
+        addAndMelt(TFCBlocks.THERMOMETER, Metal.BRASS, 200);
+        addAndMelt(TFCItems.BLOWPIPE, Metal.BRASS, 50);
+        addAndMelt(Items.COPPER_DOOR, Metal.COPPER, 200);
 
         add(TFCTags.Items.GLASS_BLOWPIPES, 0.7f);
         add(Tags.Items.RODS_WOODEN, 2.5f); // Includes twigs
