@@ -410,6 +410,8 @@ public final class TFCCreativeTabs
         out.accept(TFCItems.OLIVE_PASTE);
         out.accept(TFCItems.CANOLA_PASTE);
         out.accept(TFCItems.JUTE_NET);
+        out.accept(TFCItems.ROPE);
+        out.accept(TFCBlocks.STEEL_ROPE_ANCHOR);
         out.accept(TFCItems.HANDSTONE);
         out.accept(TFCItems.MORTAR);
         out.accept(TFCItems.PAPYRUS);

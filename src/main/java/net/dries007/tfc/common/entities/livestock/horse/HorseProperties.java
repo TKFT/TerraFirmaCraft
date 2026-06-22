@@ -11,7 +11,9 @@ import java.util.function.IntUnaryOperator;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -20,6 +22,7 @@ import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import net.dries007.tfc.common.effect.TFCEffects;
 import net.dries007.tfc.common.entities.EntityHelpers;
@@ -158,5 +161,23 @@ public interface HorseProperties extends MammalProperties
         horse.ejectPassengers();
         horse.makeMad();
         horse.level().broadcastEntityEvent(horse, (byte) 6);
+    }
+
+    @Nullable
+    @Override
+    default AgeableMob getBreedOffspring(ServerLevel level, AgeableMob other)
+    {
+        AgeableMob mob = MammalProperties.super.getBreedOffspring(level, other);
+        if (other == this && mob instanceof HorseProperties baby)
+        {
+            CompoundTag genes = getGenes();
+            if (genes == null)
+            {
+                genes = new CompoundTag();
+                createGenes(genes, this);
+            }
+            applyGenes(genes, baby);
+        }
+        return mob;
     }
 }

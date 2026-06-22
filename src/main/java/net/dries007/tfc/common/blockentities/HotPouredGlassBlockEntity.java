@@ -42,13 +42,13 @@ public class HotPouredGlassBlockEntity extends TickableBlockEntity
     public static void tick(Level level, BlockPos pos, BlockState state, HotPouredGlassBlockEntity glass)
     {
         glass.checkForLastTickSync();
-        if (!level.isClientSide && Calendars.SERVER.getTicks() - glass.created > TICKS_TO_DESTROY)
-        {
-            level.destroyBlock(pos, false);
-            Helpers.playSound(level, pos, SoundEvents.GLASS_BREAK);
-        }
         if (!glass.initialized)
         {
+            if (!level.isClientSide && Calendars.SERVER.getTicks() - glass.created > TICKS_TO_DESTROY)
+            {
+                level.destroyBlock(pos, false);
+                Helpers.playSound(level, pos, SoundEvents.GLASS_BREAK);
+            }
             return;
         }
         if (glass.animationTicks > 0)

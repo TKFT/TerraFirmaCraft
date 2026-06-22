@@ -236,6 +236,7 @@ public final class TFCItems
     public static final ItemId PURE_NITROGEN = register("pure_nitrogen");
     public static final ItemId PURE_PHOSPHORUS = register("pure_phosphorus");
     public static final ItemId PURE_POTASSIUM = register("pure_potassium");
+    public static final ItemId ROPE = register("rope", () -> new RopeItem(new Properties()));
     public static final ItemId ROTTEN_COMPOST = register("rotten_compost", () -> new RottenCompostItem(new Properties()));
     public static final ItemId SILK_CLOTH = register("silk_cloth");
     public static final ItemId SANDPAPER = register("sandpaper", () -> new Item(new Properties().durability(40)));
