@@ -10,7 +10,7 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.tags.FluidTags;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -66,14 +66,16 @@ public class RopeItem extends Item
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
-        else if (state.getBlock() instanceof MetalRopeAnchorBlock && !state.getValue(TFCBlockStateProperties.HAS_ROPE))
+        else
         {
-            // A freestanding anchor is already placed; just hand the player a knot to throw from it.
-            if (!level.isClientSide && player != null)
+            if (state.getBlock() instanceof MetalRopeAnchorBlock&& !state.getValue(TFCBlockStateProperties.HAS_ROPE) && state.getFluidState().isEmpty())
             {
-                bindToAnchor(player, level, blockpos);
+                if (!level.isClientSide && player != null)
+                {
+                    bindToAnchor(player, level, blockpos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
             }
-            return InteractionResult.sidedSuccess(level.isClientSide);
         }
         return InteractionResult.PASS;
     }
@@ -136,7 +138,7 @@ public class RopeItem extends Item
 
     public static boolean canPlaceRopeOn(Level level, BlockPos pos, BlockState state)
     {
-        return state.getBlock() instanceof RockSpikeBlock && state.getValue(RockSpikeBlock.PART) == RockSpikeBlock.Part.TIP && level.getBlockState(pos.below()).isFaceSturdy(level, pos, Direction.UP, SupportType.CENTER);
+        return state.getBlock() instanceof RockSpikeBlock && state.getValue(RockSpikeBlock.PART) == RockSpikeBlock.Part.TIP && level.getFluidState(pos).isEmpty() && level.getBlockState(pos.below()).isFaceSturdy(level, pos, Direction.UP, SupportType.CENTER);
     }
 
     public static void placeRopes(Level level, Player player, ItemStack stack, BlockPos origin)
@@ -148,6 +150,7 @@ public class RopeItem extends Item
         final BlockState hangingRope = TFCBlocks.HANGING_ROPE.get().defaultBlockState().setValue(facing, dir.getOpposite());
         final BlockState horizontalRope = TFCBlocks.ROPE.get().defaultBlockState().setValue(facing, dir.getOpposite()).setValue(GroundedRopeBlock.ASCENDING, false);
         final BlockState slopeRope = horizontalRope.setValue(GroundedRopeBlock.ASCENDING, true);
+        Helpers.playSound(level, origin, SoundEvents.FISHING_BOBBER_THROW);
 
         BlockState state = level.getBlockState(cursor);
         RopeState previous = RopeState.HORIZONTAL;
@@ -159,6 +162,7 @@ public class RopeItem extends Item
             if (anchorState.hasProperty(TFCBlockStateProperties.HAS_ROPE))
             {
                 anchorState = anchorState.setValue(TFCBlockStateProperties.HAS_ROPE, true);
+                level.scheduleTick(origin, anchorState.getBlock(), 1);
             }
             level.setBlockAndUpdate(cursor, anchorState);
         }
@@ -178,7 +182,8 @@ public class RopeItem extends Item
                         if (!hangingRope.canSurvive(level, cursor))
                             return;
                         level.setBlockAndUpdate(cursor, hangingRope);
-                        stack.shrink(1);
+                        if (!player.isCreative())
+                            stack.shrink(1);
                         cursor.move(0, -1, 0);
                     }
                     else
@@ -186,7 +191,8 @@ public class RopeItem extends Item
                         if (!slopeRope.canSurvive(level, cursor))
                             return;
                         level.setBlockAndUpdate(cursor, slopeRope);
-                        stack.shrink(1);
+                        if (!player.isCreative())
+                            stack.shrink(1);
                         previous = RopeState.SLOPE;
                         cursor.move(dir);
                     }
@@ -205,7 +211,8 @@ public class RopeItem extends Item
                             if (!hangingRope.canSurvive(level, cursor))
                                 return;
                             level.setBlockAndUpdate(cursor, hangingRope);
-                            stack.shrink(1);
+                            if (!player.isCreative())
+                                stack.shrink(1);
                             cursor.move(0, -1, 0);
                             previous = RopeState.VERTICAL;
                         }
@@ -214,7 +221,8 @@ public class RopeItem extends Item
                             if (!slopeRope.canSurvive(level, cursor))
                                 return;
                             level.setBlockAndUpdate(cursor, slopeRope);
-                            stack.shrink(1);
+                            if (!player.isCreative())
+                                stack.shrink(1);
                             previous = RopeState.SLOPE;
                             cursor.move(dir);
                         }
@@ -228,7 +236,8 @@ public class RopeItem extends Item
                             if (!horizontalRope.canSurvive(level, cursor))
                                 return;
                             level.setBlockAndUpdate(cursor, horizontalRope);
-                            stack.shrink(1);
+                            if (!player.isCreative())
+                                stack.shrink(1);
                             previous = RopeState.HORIZONTAL;
                             cursor.move(dir);
                         }
@@ -240,7 +249,7 @@ public class RopeItem extends Item
 
     private static boolean canRopeReplace(BlockState state)
     {
-        return state.canBeReplaced() && (state.getFluidState().isEmpty() || Helpers.isFluid(state.getFluidState(), FluidTags.WATER));
+        return state.canBeReplaced() && state.getFluidState().isEmpty();
     }
 
     private enum RopeState

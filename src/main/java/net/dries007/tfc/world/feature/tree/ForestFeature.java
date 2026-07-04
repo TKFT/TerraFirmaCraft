@@ -57,7 +57,7 @@ public class ForestFeature extends Feature<ForestConfig>
         final ForestType forestType = data.getForestType();
 
         // This needs to happen before the random early exit
-        placeSoilDisc(level, context.chunkGenerator(), random, config, data, mutablePos.set(pos));
+        placeSoilDisc(level, context.chunkGenerator(), random, config, data, mutablePos.set(pos), forestType);
 
         if (random.nextFloat() > forestType.getPerChunkChance()) return false;
 
@@ -335,10 +335,26 @@ public class ForestFeature extends Feature<ForestConfig>
         }
     }
 
-    private boolean placeSoilDisc(WorldGenLevel level, ChunkGenerator generator, RandomSource random, ForestConfig config, ChunkData chunkData, BlockPos.MutableBlockPos mutablePos)
+    private boolean placeSoilDisc(WorldGenLevel level, ChunkGenerator generator, RandomSource random, ForestConfig config, ChunkData chunkData, BlockPos.MutableBlockPos mutablePos, ForestType type)
     {
+        mutablePos.setY(level.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, mutablePos.getX(), mutablePos.getZ()));
+
         // We need to get the full list, not just one tree from it
         final List<ForestConfig.Entry> entries = getTrees(chunkData, config, mutablePos, level);
+
+        // Remove excess entries in the same way as the getTree method
+        final int maxSize = type.getMaxTreeTypes();
+        final int originalSize = entries.size();
+        for (int i = maxSize; i < originalSize; i++)
+        {
+            entries.removeLast();
+        }
+        int alternate = type.getAlternateSize();
+        while (entries.size() > 1 && alternate > 0)
+        {
+            entries.remove(0);
+            alternate--;
+        }
 
         boolean placed = false;
         // We loop through all trees that may be placed, so that higher priority soil discs can override lower priority ones
