@@ -33,6 +33,7 @@ public final class TFCCommands
             .then(CountBlockCommand.create(context))
             .then(PropickCommand.create())
             .then(AddTrimCommand.create(context))
+            .then(RiverMouthDebugCommand.create()) // TEMPORARY (river delta prototype) — removed before PR
         );
 
         // For command modifications / replacements, we register directly
