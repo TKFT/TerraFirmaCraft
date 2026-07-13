@@ -142,6 +142,12 @@ public class BiomeBuilder
 
     public BiomeBuilder type(RiverBlendType type)
     {
+        if (type == RiverBlendType.DELTA)
+        {
+            // DELTA is dispatched terminal-locally from the cached river mouth context only. If a biome owned it,
+            // the delta sampler would activate along the biome's entire river length, not just the final mouth zone.
+            throw new IllegalArgumentException("RiverBlendType.DELTA must never be assigned to a biome");
+        }
         this.riverBlendType = type;
         if (type == RiverBlendType.CAVE)
             this.sandyRiverShores = false;

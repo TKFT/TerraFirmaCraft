@@ -25,6 +25,9 @@ import net.dries007.tfc.world.river.MidpointFractal;
 import net.dries007.tfc.world.river.RiverBlendType;
 import net.dries007.tfc.world.river.RiverInfo;
 import net.dries007.tfc.world.river.RiverNoiseSampler;
+import net.dries007.tfc.world.river.mouth.RiverMouthChannelSample;
+import net.dries007.tfc.world.river.mouth.RiverMouthResolver;
+import net.dries007.tfc.world.river.mouth.RiverMouthSample;
 import net.dries007.tfc.world.shore.ShoreBlendType;
 import net.dries007.tfc.world.shore.ShoreNoiseSampler;
 import net.dries007.tfc.world.volcano.CenteredFeatureBlendType;
@@ -46,6 +49,12 @@ public class ChunkHeightFiller
     protected final BiomeSourceExtension biomeSource;
     protected final Map<RiverBlendType, RiverNoiseSampler> riverNoiseSamplers;
     protected final double[] riverBlendWeights; // Indexed by RiverBlendType.ordinal
+
+    // Terminal river mouths (deltas). The DELTA sampler is dispatched by the cached mouth context and fan mask
+    // weight, never through the biome-derived river blend weights above.
+    protected final @Nullable RiverMouthResolver riverMouthResolver;
+    protected @Nullable RiverMouthSample riverMouthSample; // Current column's mouth sample, or null
+    protected double riverMouthWeight; // Current column's fan mask weight, 0 when outside any mouth
 
     // Shores
     protected final Map<ShoreBlendType, ShoreNoiseSampler> shoreNoiseSamplers;
@@ -69,6 +78,7 @@ public class ChunkHeightFiller
         this.biomeSource = biomeSource;
         this.riverNoiseSamplers = riverNoiseSamplers;
         this.riverBlendWeights = new double[RiverBlendType.SIZE];
+        this.riverMouthResolver = biomeSource.riverMouthResolver();
 
         this.shoreNoiseSamplers = shoreNoiseSamplers;
         this.shoreBlendWeights = new double[ShoreBlendType.SIZE];
@@ -197,6 +207,10 @@ public class ChunkHeightFiller
 
         assert biomeAt != null;
 
+        // Terminal river mouths (deltas) are resolved independently of biome blend weights. Fan shaping applies
+        // after shore transformations, before the ordinary river carve.
+        height = adjustHeightForTerminalMouth(height);
+
         computeInitialRiverWeights(biomeWeights);
 
         final RiverInfo info = sampleRiverInfo(useCache);
@@ -318,6 +332,60 @@ public class ChunkHeightFiller
             riverBlendWeights[RIVER_TYPE_NONE] = 1.0;
             return height;
         }
+    }
+
+    /**
+     * Applies the terminal delta fan to the height, when the column is inside a qualifying mouth's fan mask.
+     * The DELTA sampler is invoked directly with the fan mask weight - it is never part of the biome-derived
+     * {@link #riverBlendWeights}, so a wide shore biome can never activate it beyond the cached terminal mask.
+     */
+    private double adjustHeightForTerminalMouth(final double height)
+    {
+        riverMouthSample = null;
+        riverMouthWeight = 0;
+        if (riverMouthResolver == null)
+        {
+            return height;
+        }
+
+        final RiverMouthSample mouth = riverMouthResolver.sample(
+            biomeSource.getPartition(blockX, blockZ),
+            Units.blockToGridExact(blockX),
+            Units.blockToGridExact(blockZ));
+        if (mouth == null || mouth.terrainWeight() <= 0)
+        {
+            return height;
+        }
+
+        riverMouthSample = mouth;
+        riverMouthWeight = mouth.terrainWeight();
+
+        final RiverNoiseSampler sampler = riverNoiseSamplers.get(RiverBlendType.DELTA);
+        return sampler.setColumnAndSampleHeight(mouthChannelInfo(mouth), blockX, blockZ, height, riverMouthWeight);
+    }
+
+    /**
+     * Adapts the nearest mouth channel into {@link RiverInfo} shape for the DELTA sampler: {@code distSq} and
+     * {@code widthSq} are to that channel, in blocks². While the mouth has no channel network yet (diagnostic
+     * phases), the terminal trunk's fractal is the mouth channel.
+     */
+    private RiverInfo mouthChannelInfo(RiverMouthSample mouth)
+    {
+        final RiverEdge edge = mouth.context().edge();
+        final double exactGridX = Units.blockToGridExact(blockX);
+        final double exactGridZ = Units.blockToGridExact(blockZ);
+
+        final RiverMouthChannelSample channel = mouth.channel();
+        if (channel != null)
+        {
+            final double scale = Units.GRID_WIDTH_IN_BLOCK; // Channel geometry is stored in grid units
+            final double dist = channel.distanceGrid() * scale;
+            final double width = channel.widthGrid() * scale;
+            return new RiverInfo(edge, channel.flow(), dist * dist, width * width);
+        }
+
+        final double distSq = edge.fractal().intersectDistance(exactGridX, exactGridZ) * Units.GRID_WIDTH_IN_BLOCK * Units.GRID_WIDTH_IN_BLOCK;
+        return new RiverInfo(edge, edge.fractal().calculateFlow(exactGridX, exactGridZ), distSq, edge.widthSq(exactGridX, exactGridZ));
     }
 
     private double adjustHeightForVolcanic(final double heightIn)

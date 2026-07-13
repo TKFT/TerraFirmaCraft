@@ -22,7 +22,8 @@ public enum RiverBlendType
     TALL_CANYON(RiverNoise::tallCanyon), // Slot canyons with undercut walls
     TALUS(RiverNoise::talus), // Single line of cliffs with steep slopes above and below
     TERRACES(RiverNoise::terraces), // Stair-step canyons, like the Grand Canyon
-    CAVE(RiverNoise::cave); // Underground river
+    CAVE(RiverNoise::cave), // Underground river
+    DELTA(RiverNoise::delta); // Terminal river delta. Never assigned to a biome - dispatched terminal-locally from the cached mouth context only (see net.dries007.tfc.world.river.mouth)
 
     public static final RiverBlendType[] ALL = values();
     public static final int SIZE = ALL.length;

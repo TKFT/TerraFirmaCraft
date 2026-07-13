@@ -606,6 +606,15 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
             }
         }
 
+        // Apply the terminal mouth (delta) transformation. DELTA has no biome-derived blend weight, so it can
+        // never be invoked by the loop above - instead its contribution replaces a fan-mask-weighted share of the
+        // combined river contribution. The sampler's column state was initialized by the mouth pass in
+        // sampleColumnHeightAndBiome, which runs for every column that sets riverMouthWeight > 0.
+        if (riverMouthWeight > 0)
+        {
+            final RiverNoiseSampler sampler = riverNoiseSamplers.get(RiverBlendType.DELTA);
+            noise = postShoreNoise + Mth.lerp(riverMouthWeight, noise - postShoreNoise, sampler.noise(y, postShoreNoise));
+        }
 
         noise = BiomeNoiseSampler.AIR_THRESHOLD - noise; // Positive noise = solid
         if (y > heightNoiseValue)

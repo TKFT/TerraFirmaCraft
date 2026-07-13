@@ -462,4 +462,97 @@ public final class RiverNoise
             }
         };
     }
+
+    /**
+     * Terminal river delta: channel beds with natural levees, and an island / wet-flat
+     * patchwork plain between distributaries.
+     *
+     * <p><b>Contract differs from ordinary blend types:</b> {@code info} is the nearest
+     * <em>mouth channel</em> (trunk or distributary, adapted into {@link RiverInfo} by the
+     * mouth resolver), and {@code thisWeight} is the fan mask weight in {@code (0, 1]} — the
+     * sampler lerps against {@code heightIn} with it, so the mask's feathered boundary does
+     * all inland/seaward blending. Never assign {@code DELTA} to a biome.
+     */
+    public static RiverNoiseSampler delta(Seed seed)
+    {
+        return new RiverNoiseSampler()
+        {
+            // Same channel-edge fuzz idiom as every other sampler.
+            final Noise2D distNoise = new OpenSimplex2D(seed.next()).octaves(4).spread(0.05f).scaled(-0.2f, 0.2f);
+            // Island / wet-flat patchwork: low frequency -> landforms tens of blocks across.
+            final Noise2D islandNoise = new OpenSimplex2D(seed.next()).octaves(3).spread(0.012f).scaled(-1f, 1f);
+            // Levee crest variation, so banks undulate instead of extruding.
+            final Noise2D leveeNoise = new OpenSimplex2D(seed.next()).octaves(2).spread(0.06f).scaled(-0.5f, 0.5f);
+            // Fine surface ripple over the whole plain.
+            final Noise2D surfaceNoise = new OpenSimplex2D(seed.next()).octaves(4).spread(0.09f).scaled(-0.6f, 0.6f);
+
+            double height;
+
+            @Override
+            public double setColumnAndSampleHeight(RiverInfo info, int x, int z, double heightIn, double thisWeight)
+            {
+                final double distFac = info.normDistSq() * 0.8f + distNoise.noise(x, z);
+
+                // Channel depth and levee height both scale with the channel's width, so the
+                // trunk carves deep with pronounced banks while tapered distributaries carve
+                // shallow with subtle ones.
+                final double depth = Mth.clampedMap(info.widthSq(),
+                    RiverEdge.MIN_WIDTH * RiverEdge.MIN_WIDTH, RiverEdge.MAX_WIDTH * RiverEdge.MAX_WIDTH, 2.5, 6);
+                final double leveeCrest = Mth.clampedMap(info.widthSq(),
+                    RiverEdge.MIN_WIDTH * RiverEdge.MIN_WIDTH, RiverEdge.MAX_WIDTH * RiverEdge.MAX_WIDTH, 0.5, 2)
+                    + leveeNoise.noise(x, z);
+
+                // The plain: mostly wet flats and shallow ponds near sea level, with distinct
+                // raised islands. Squaring the positive lobe sharpens islands; the negative
+                // lobe bottoms out as pond / abandoned-channel depressions.
+                final double island = islandNoise.noise(x, z);
+                final double plain = SEA_LEVEL_Y
+                    + (island > 0 ? island * island * 3 : Math.max(island * 1.2, -1.2))
+                    + surfaceNoise.noise(x, z);
+
+                final double deltaHeight;
+                if (distFac < 1)
+                {
+                    // Channel bed: floor at SEA - 1.5 - depth, rising to SEA - 1.5 at the edge.
+                    deltaHeight = SEA_LEVEL_Y - 1.5 - depth + distFac * depth;
+                }
+                else if (distFac < 1.25)
+                {
+                    // Levee rise: bank climbs from the waterline edge to the crest.
+                    final double t = (distFac - 1) / 0.25;
+                    deltaHeight = Mth.lerp(t * t * (3 - 2 * t), SEA_LEVEL_Y - 1.5, SEA_LEVEL_Y + leveeCrest);
+                }
+                else if (distFac < 1.75)
+                {
+                    // Levee fall: crest subsides into the island / wet-flat plain.
+                    final double t = (distFac - 1.25) / 0.5;
+                    deltaHeight = Mth.lerp(t * t * (3 - 2 * t), SEA_LEVEL_Y + leveeCrest, plain);
+                }
+                else
+                {
+                    deltaHeight = plain;
+                }
+
+                // Defense in depth behind the classifier's shallow-shelf gate: a delta may
+                // shoal deep water, never build land into it.
+                final double capped = Math.min(deltaHeight, heightIn + 8);
+
+                // The fan mask owns all boundary blending (feathered, noisy edge).
+                final double w = Mth.clamp(thisWeight, 0, 1);
+                return height = Mth.lerp(w, heightIn, capped);
+            }
+
+            @Override
+            public double noise(int y, double noiseIn)
+            {
+                // Same boatable-roof carve as FLOODPLAIN, limited to genuinely deep channel
+                // columns to avoid wide flat caves under the plain.
+                if (height < SEA_LEVEL_Y - 2.5 && y > height && y < SEA_LEVEL_Y + 2 + (SEA_LEVEL_Y - height))
+                {
+                    return 1;
+                }
+                return y > height ? 0 : noiseIn;
+            }
+        };
+    }
 }

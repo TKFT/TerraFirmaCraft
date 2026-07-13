@@ -172,3 +172,44 @@ Deviations / decisions:
   scale this is exactly the trunk's block width.
 
 ---
+
+## Phase 2 — `RiverBlendType.DELTA` + terminal-local dispatch
+
+- `RiverNoise.delta` implemented exactly per DELTA_NOISE_SAMPLER.md §3 (style
+  adaptation only). The pre-existing working-tree experiment (fan geometry inside
+  the sampler) was discarded in favor of the locked design. `DELTA` added to
+  `RiverBlendType` at the END of the enum — because sampler creation walks the
+  enum in ordinal order off one stable seed stream, appending (not inserting)
+  keeps every existing sampler's seeds identical to master.
+- **No-biome-owns-DELTA enforced twice:** `BiomeBuilder.type(RiverBlendType)`
+  throws on DELTA (compile-path guard), and `TFCChunkGenerator.initRandomState`
+  scans `TFCBiomes.REGISTRY` at world load and throws if any registered extension
+  (including addon-registered ones that bypass the builder) resolves to DELTA.
+- Dispatch in `ChunkHeightFiller.adjustHeightForTerminalMouth`, between the
+  shore/ocean stage and `computeInitialRiverWeights` (impl plan §4.4 slot). The
+  DELTA sampler is invoked directly with `thisWeight` = fan mask weight and
+  `info` = nearest mouth channel adapted to `RiverInfo` (while no channel network
+  exists, the terminal trunk's own fractal is the mouth channel — distance
+  computed from the fractal directly, NOT via the ordinary 50-block river search,
+  so it works across the whole fan and through shore columns).
+- Density pass: per the Phase 0 finding, `ChunkNoiseFiller.calculateNoiseAtHeight`
+  gets an explicit delta hook after the weighted river loop:
+  `noise = postShore + lerp(w, riverContribution, delta.noise(y, postShore))` —
+  the delta replaces a mask-weighted share of the combined river contribution,
+  reducing to exactly a full-weight blend-type at w = 1 and a no-op at w = 0.
+- Tests: the six sampler tests from DELTA_NOISE_SAMPLER.md §6
+  (`DeltaRiverNoiseTest`; the levee-vs-plain test probes deterministically for a
+  wet-flat position since raised islands may legitimately exceed the levee crest),
+  plus `DeltaWorldgenTest` — a headless twin of the `TFCChunkGenerator` height
+  pipeline that runs two `ChunkHeightFiller` stacks (resolver on/off) on a fixed
+  seed and asserts: a qualifying delta exists, terrain visibly changes (≥ 2
+  blocks) inside its fan mask, and **every column outside the mask — the rest of
+  the wide shore biome and all nonqualifying rivers included — is bit-identical**.
+  This is the automated stand-in for the in-game Phase 2 gate.
+- Master-equivalence note: on master-vs-branch (not just resolver on/off), all
+  non-mouth terrain is also unchanged because (a) DELTA appends to the end of the
+  enum (seed streams for existing samplers unchanged), (b) the registry scan in
+  `initRandomState` consumes no RNG, and (c) the resolver reads `Seed.seed()`
+  without consuming `next()`.
+
+---

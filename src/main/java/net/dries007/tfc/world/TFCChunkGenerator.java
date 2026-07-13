@@ -204,6 +204,17 @@ public class TFCChunkGenerator extends ChunkGenerator implements ChunkGeneratorE
 
         final Seed seed = Seed.of(level.getSeed());
 
+        // Defensive check: DELTA is dispatched terminal-locally from the river mouth context, never through biome
+        // configuration. No registered biome extension (including addon-registered ones that bypass BiomeBuilder)
+        // may resolve to it, or the delta sampler would activate along the biome's entire river length.
+        for (BiomeExtension biome : TFCBiomes.REGISTRY)
+        {
+            if (biome.riverBlendType() == RiverBlendType.DELTA)
+            {
+                throw new IllegalStateException("Biome " + biome.key() + " must not use RiverBlendType.DELTA - it is dispatched terminal-locally only");
+            }
+        }
+
         final RegionGenerator regionGenerator = new RegionGenerator(settings, seed);
         final AreaFactory factory = TFCLayers.createRegionBiomeLayer(regionGenerator, seed);
         final ConcurrentArea<BiomeExtension> biomeLayer = new ConcurrentArea<>(factory, TFCLayers::getFromLayerId);
