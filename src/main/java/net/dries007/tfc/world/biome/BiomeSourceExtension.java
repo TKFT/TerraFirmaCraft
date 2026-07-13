@@ -15,12 +15,15 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 
+import org.jetbrains.annotations.Nullable;
+
 import net.dries007.tfc.TerraFirmaCraft;
 import net.dries007.tfc.world.layer.framework.ConcurrentArea;
 import net.dries007.tfc.world.region.RegionGenerator;
 import net.dries007.tfc.world.region.RegionPartition;
 import net.dries007.tfc.world.region.RiverEdge;
 import net.dries007.tfc.world.region.Units;
+import net.dries007.tfc.world.river.mouth.RiverMouthResolver;
 import net.dries007.tfc.world.settings.Settings;
 
 public interface BiomeSourceExtension
@@ -61,6 +64,15 @@ public interface BiomeSourceExtension
     Holder<Biome> getBiomeFromExtension(BiomeExtension extension);
 
     RegionPartition.Point getPartition(int blockX, int blockZ);
+
+    /**
+     * @return The terminal river mouth resolver, if this biome source supports river mouths.
+     */
+    @Nullable
+    default RiverMouthResolver riverMouthResolver()
+    {
+        return null;
+    }
 
     /**
      * Optimized version of {@link BiomeSource#findBiomeHorizontal(int, int, int, int, Predicate, RandomSource, Climate.Sampler)} for finding spawn biomes.

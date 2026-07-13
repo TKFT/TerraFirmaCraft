@@ -1,0 +1,174 @@
+# River Delta Prototype — Implementation Notes
+
+Branch: `feature/river-delta-prototype`. This file becomes the PR description.
+Phases follow `RIVER_MOUTHS_BLENDTYPE_IMPLEMENTATION_PLAN.md`; locked design values
+from `RIVER_DELTA_DESIGN.md`; sampler from `DELTA_NOISE_SAMPLER.md`.
+
+---
+
+## Phase 0 — Ground-truth verification
+
+### Height pipeline order (CONFIRMED, `ChunkHeightFiller.sampleColumnHeightAndBiome`)
+
+1. Weighted biome blend over `BiomeNoiseSampler.height()` (also partitions weights
+   into normal / shore / ocean groups).
+2. Shore transformation: `adjustHeightForShoreContributions` — per-`ShoreBlendType`
+   weighted samplers.
+3. Ocean tide-edge clamp when `oceanWeight >= 0.25` (pulls height toward
+   `tideHeightNoise - 4` as land weight drops through 0.36 → 0.32).
+4. `computeInitialRiverWeights` (biome → `RiverBlendType` weight array), then
+   `sampleRiverInfo`, then `adjustHeightForRiverContributions` — per-blend-type
+   weighted river samplers.
+5. Volcanic (centered features) last, may override rivers.
+
+**Terminal delta pass slots between (3) and (4)** — after shore + ocean clamp,
+before the ordinary river carve — exactly the impl plan §4.4 slot. The DELTA
+sampler is invoked out-of-band (never via `riverBlendWeights`, which is derived
+purely from biome `riverBlendType()` — no biome maps to DELTA, so its weight is
+structurally always 0 there).
+
+### Deviations / discoveries vs. the implementation plan
+
+1. **The density (`noise(y)`) pass needs its own out-of-band hook.**
+   `ChunkNoiseFiller.calculateNoiseAtHeight` iterates river samplers by the same
+   biome-derived `riverBlendWeights`; a weight-0 sampler is never called. The plan
+   only describes the height-pass dispatch (§4.4). The delta sampler's boatable-roof
+   carve therefore needs an explicit invocation in `calculateNoiseAtHeight`,
+   blended as `noise = (1-w)*noise + w*delta.noise(y, postShoreNoise)` with the fan
+   mask weight `w`, mirroring how weighted samplers compose. Also note: when
+   `RiverInfo == null`, `adjustHeightForRiverContributions` force-sets
+   `riverBlendWeights` to NONE=1.0 specifically so `noise()` is never called on
+   uninitialized samplers — the delta hook must respect the same rule (only call
+   `noise()` on columns where the height pass initialized the sampler).
+2. **`RiverInfo` javadoc is stale**: claims width raw value clamped `[8, 18]`;
+   actual bounds are `RiverEdge.MIN_WIDTH = 8`, `MAX_WIDTH = 24`
+   (`AddRiversAndLakes.annotateRiverGridScale`: source edges start at 8, +2 per
+   edge downstream, capped at 24). Width thresholds are keyed off 8/24.
+3. **Terminal edge structure (CONFIRMED)**: `RiverEdge.drainEdge() == null` is the
+   terminal test. Rivers are built *from the mouth upstream*
+   (`AddRiversAndLakes.createInitialDrains`): the drain vertex of a terminal edge
+   sits at a **shore region point** + 0.5 grid offset. `edge.drain()` is the
+   sea-side vertex, `edge.source()` the upstream vertex. `MidpointFractal`
+   bisection preserves both endpoints, so the rendered trunk terminates exactly at
+   the graph drain; only the *biome* coastline drifts (quart-scale zoom), which is
+   what the anchor march corrects for.
+4. **Edge length**: one graph edge is ~2.7 grid (`RIVER_LENGTH`), shrinking ~0.92×
+   per step upstream; a 4-bisection fractal has 16 sub-segments of ~0.17 grid each.
+   The design doc's flavor claim that 100–135 blocks "equals 1–2 midpoint-fractal
+   segments" is off (it's ~5–6 sub-segments); the locked block/grid dimensions are
+   used as-is, the fractal-segment equivalence is ignored. (Flagged, not resolved.)
+5. **`RegionPartition.Point.rivers()` (CONFIRMED)**: per 3-grid partition point,
+   lists every edge whose center is within `1 + ceil(1.5 * 2.7) = 6` grid
+   (`RiverEdge.MAX_AFFECTING_GRID_DISTANCE`, applied as a partition-rect). A major
+   fan (≤ ~1.25 grid inland + ~1.75 lateral from a drain that lies ON the edge)
+   is comfortably inside this envelope → the existing partition lookup suffices,
+   no new spatial index. The ordinary river *search radius* (50 blocks in
+   `sampleRiverEdge`) is the thing that's too short; the mouth resolver does its
+   own partition scan for terminal edges.
+6. **River biome overlay (CONFIRMED, two places)**:
+   - Worldgen-visible biome: `BiomeSourceExtension.getBiomeExtension` overlays
+     `TFCBiomes.RIVER` where `biome.hasRivers()` && fractal intersects within
+     0.08 grid (~10 blocks).
+   - Chunk-local biome for surface/features: `ChunkNoiseFiller.updateLocalCaches`
+     sets `localBiomes` to RIVER where `height <= SEA+1 && normDistSq < 1.1 &&
+     biomeAt.hasRivers()`.
+   Both are gated on `hasRivers()`; all shore biomes use `.noRivers()` → both
+   sites need the bounded mouth-channel exception (Phase 3).
+7. **Flow/water (CONFIRMED)**: `ChunkNoiseFiller.sampleRiverData` samples 16×16
+   per-block `RiverInfo` + 5×5 quart `Flow` (flow kept only where
+   `normDistSq < 0.28`); `fillColumn` computes flow only when
+   `localBiome.hasRivers()` — river water blocks are placed only where
+   water + flow ≠ NONE + `y >= min(seaLevel-4, height)`. So distributary water
+   placement needs: local biome override (see 6) + flow injection at the 5×5 quart
+   flow grid + per-block `RiverInfo` (or mouth-channel equivalent).
+8. **No stock worldgen-scale value exists.** `Settings` has no zoom/scale knob;
+   grid→block scale is the fixed `Units.GRID_WIDTH_IN_BLOCK = 128`. The impl
+   plan's "locate the Large Biomes scale source" resolves to: store geometry in
+   grid units and multiply by a `worldgenScale` field (default 1.0) owned by the
+   resolver — the single point an addon/large-biomes fork would set.
+9. **Seed access (CONFIRMED)**: `RegionBiomeSource.initRandomState` receives
+   `RegionGenerator`, which exposes `seed()` (the level `Seed`). The resolver
+   derives all shape seeds from `regionGenerator.seed().seed()` + hashes of
+   quantized drain coordinates. No identity hashes anywhere.
+10. **Raw biome field for the anchor march**: `getBiomeExtensionNoRiver(quartX,
+    quartZ)` (thread-safe `ConcurrentArea`). March step 0.125 grid = 4 quarts
+    exactly, so the march samples the raw field at its native resolution boundary.
+11. **Pre-existing working-tree experiment replaced.** The branch inherited an
+    uncommitted, older `RiverNoise.delta` prototype (fan geometry + distributary
+    tree computed *inside* the sampler). It contradicts the locked sampler design
+    (mask/channels are resolver-owned; sampler is a pure radial profile) and was
+    replaced by the `DELTA_NOISE_SAMPLER.md` version in Phase 2. Copy preserved
+    outside the repo during development.
+
+### Biome-set groundwork for the classifier (Phase 1)
+
+From `TFCBiomes` as registered today:
+
+- Eligible shore at anchor (locked, design §5): `SHORE`, `TIDAL_FLATS`;
+  `COASTAL_DUNES` compact-tier only; everything else rejected (`EMBAYMENTS`
+  explicitly reserved for ESTUARY).
+- Shallow ocean ahead: `OCEAN`, `OCEAN_REEF`, `OCEAN_ATOLLS` (all floor −26..−8).
+- Deep/forbidden in construction area: `DEEP_OCEAN`, `DEEP_OCEAN_TRENCH`,
+  `DEEP_OCEAN_ATOLLS`, `OCEAN_RIDGE`, `OCEANIC_VOLCANIC_ARC` (volcanic ⇒ reject
+  per compatibility matrix).
+- Flat/low inland family (strict v1, design §5.1): `PLAINS`, `HILLS`, `LOWLANDS`,
+  `SALT_MARSH`, `RIVER_VALLEY`, `LOW_CANYONS`, `MUD_FLATS`, `PATTERNED_GROUND`,
+  `INVERTED_PATTERNED_GROUND`, `STONE_CIRCLES`, `KNOB_AND_KETTLE`,
+  `DOLINE_PLAINS`, `CENOTE_PLAINS`.
+
+### Debug tooling
+
+`/tfc riverMouthDebug` (TEMPORARY — removed/gated before PR): dumps, for the
+player's position: nearest terminal edges in the partition, their drain/source
+grid coords, widths, and the raw (no-river) biome along the drain→sea march.
+Added in Phase 0; grows mouth-context output in later phases.
+
+---
+
+## Phase 1 — Terminal context foundation
+
+New package `net.dries007.tfc.world.river.mouth`:
+
+- `DeltaTier` — COMPACT / NORMAL / MAJOR, width thresholds (14 / 17 / 22 blocks of
+  terminal width — clearly tunable), locked grid-unit dimension ranges from
+  RIVER_DELTA_DESIGN.md §2, and distributary count ranges for Phase 4.
+- `RiverMouthContext`, `RiverMouthChannel`, `RiverMouthChannelSegment`,
+  `RiverMouthChannelSample`, `RiverMouthSample` — records per the impl plan §3,
+  plus a `DeltaTier` field on the context (the plan allows shaping the context for
+  later extraction; tier is needed for the dunes-compact-only rule and Phase 4
+  branch counts).
+- `RiverMouthBiomes` — centralized biome-group predicates (eligible shores,
+  shallow/deep oceans, flat inland family, anchor-march land/ocean categories).
+- `RiverMouthClassifier` — strict pure function over a
+  `RiverMouthClassificationInput` value; unit-tested across the condition matrix.
+- `RiverMouthGeometry` — flow-aligned projection, wedge mask pinching from full
+  fan half-width at the coast to ~1.25× trunk width at the inland tip, feathered
+  boundary modulated by two-octave deterministic *sector noise* (pure function of
+  shapeSeed + angle; never a smooth arc).
+- `RiverMouthResolver` — terminal detection, coastline-anchor march (0.125-grid
+  steps, 3.0-grid cap, raw biome field only, inland/seaward direction chosen by
+  the drain's rendered category, drain fallback), classifier-input sampling,
+  deterministic dimension jitter, and caching.
+- `RiverMouthRandom` — SplitMix64-based hashing for all shape jitter.
+
+Wiring: `BiomeSourceExtension.riverMouthResolver()` (default null) +
+`RegionBiomeSource` creates the resolver in `initRandomState`. **No worldgen code
+path calls it yet.** The resolver constructor reads `Seed.seed()` (a getter — it
+does NOT consume `Seed.next()`), so the RNG stream feeding every existing noise
+sampler is untouched → worldgen output is bit-identical by construction.
+
+Deviations / decisions:
+
+- Cache is `MapMaker().weakKeys()` (Guava, already a dependency) rather than a
+  plain `ConcurrentHashMap`: `RiverEdge` instances are owned by the evicting
+  region cache, and a strong-keyed map would leak evicted regions. Weak keys use
+  identity — correct here — and a regenerated equal-coordinate edge resolves to a
+  bit-identical context (unit-tested), so eviction can never affect output.
+- "Ahead" classifier samples reach ~0.9 grid past the fan front: the rendered
+  shore band can be wider than the seaward reach, so requiring open water
+  immediately past the front would falsely reject legitimate mouths.
+- Channel widths will be stored in grid units and scaled with `worldgenScale`
+  like all other mouth geometry (consistent whole-mouth expansion). At stock
+  scale this is exactly the trunk's block width.
+
+---

@@ -22,6 +22,7 @@ import net.dries007.tfc.world.layer.framework.ConcurrentArea;
 import net.dries007.tfc.world.region.RegionGenerator;
 import net.dries007.tfc.world.region.RegionPartition;
 import net.dries007.tfc.world.region.Units;
+import net.dries007.tfc.world.river.mouth.RiverMouthResolver;
 
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class RegionBiomeSource extends BiomeSource implements BiomeSourceExtension
@@ -34,6 +35,7 @@ public class RegionBiomeSource extends BiomeSource implements BiomeSourceExtensi
 
     private RegionGenerator regionGenerator;
     private ConcurrentArea<BiomeExtension> biomeLayer;
+    private RiverMouthResolver riverMouthResolver;
 
     public RegionBiomeSource(HolderGetter<Biome> biomeRegistry)
     {
@@ -58,10 +60,19 @@ public class RegionBiomeSource extends BiomeSource implements BiomeSourceExtensi
     }
 
     @Override
+    public RiverMouthResolver riverMouthResolver()
+    {
+        return riverMouthResolver;
+    }
+
+    @Override
     public void initRandomState(RegionGenerator regionGenerator, ConcurrentArea<BiomeExtension> biomeLayer)
     {
         this.regionGenerator = regionGenerator;
         this.biomeLayer = biomeLayer;
+        // Stock TFC has no worldgen scale setting - the 1.0 here is the single point a large-biomes style scale
+        // multiplier would be fed into mouth generation. All mouth geometry is stored in unscaled grid units.
+        this.riverMouthResolver = new RiverMouthResolver(regionGenerator.seed().seed(), biomeLayer::get, 1.0);
     }
 
     @Override
