@@ -43,6 +43,8 @@ import net.dries007.tfc.world.river.MidpointFractal;
 import net.dries007.tfc.world.river.RiverBlendType;
 import net.dries007.tfc.world.river.RiverInfo;
 import net.dries007.tfc.world.river.RiverNoiseSampler;
+import net.dries007.tfc.world.river.mouth.RiverMouthChannelSample;
+import net.dries007.tfc.world.river.mouth.RiverMouthSample;
 import net.dries007.tfc.world.shore.ShoreBlendType;
 import net.dries007.tfc.world.shore.ShoreNoiseSampler;
 import net.dries007.tfc.world.volcano.CenteredFeatureBlendType;
@@ -670,7 +672,11 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
         final int localIndex = localX + 16 * localZ;
 
         localBiomesNoRivers[localIndex] = biomeAt;
-        if (height <= SEA_LEVEL_Y + 1 && info != null && info.normDistSq() < 1.1 && biomeAt.hasRivers())
+        if (height <= SEA_LEVEL_Y + 1
+            && ((info != null && info.normDistSq() < 1.1 && biomeAt.hasRivers())
+            // Terminal mouth channels overlay the river biome through .noRivers() shore and ocean columns,
+            // bound to the specific mouth network resolved for this column
+            || isNearMouthChannel(1.1)))
         {
             biomeAt = TFCBiomes.RIVER;
         }
@@ -738,9 +744,32 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
                     info = sampleRiverEdge(point);
                 }
 
-                riverFlows[quartX + 5 * quartZ] = info != null && info.normDistSq() < 0.28 ? info.flow() : Flow.NONE;
+                riverFlows[quartX + 5 * quartZ] = info != null && info.normDistSq() < 0.28
+                    ? info.flow()
+                    : sampleMouthChannelFlow(point, chunkMinX + localX, chunkMinZ + localZ);
             }
         }
+    }
+
+    /**
+     * @return The flow of the terminal mouth channel near the given position, or {@link Flow#NONE}. Mouth channels
+     * supply flow through .noRivers() shore and ocean columns, where the ordinary river data has none - this is
+     * what keeps river water flowing from the trunk out to the sea.
+     */
+    private Flow sampleMouthChannelFlow(RegionPartition.Point point, int blockX, int blockZ)
+    {
+        if (riverMouthResolver == null)
+        {
+            return Flow.NONE;
+        }
+        final RiverMouthSample mouth = riverMouthResolver.sample(point, Units.blockToGridExact(blockX), Units.blockToGridExact(blockZ));
+        if (mouth == null || mouth.channel() == null)
+        {
+            return Flow.NONE;
+        }
+        final RiverMouthChannelSample channel = mouth.channel();
+        final double width = channel.widthGrid() * mouth.context().worldgenScale();
+        return width > 0 && channel.distanceGrid() * channel.distanceGrid() < 0.28 * width * width ? channel.flow() : Flow.NONE;
     }
 
     private double sampleRiverDistSq(int blockX, int blockZ)

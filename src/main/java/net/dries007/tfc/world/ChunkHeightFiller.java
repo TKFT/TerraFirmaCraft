@@ -388,6 +388,25 @@ public class ChunkHeightFiller
         return new RiverInfo(edge, edge.fractal().calculateFlow(exactGridX, exactGridZ), distSq, edge.widthSq(exactGridX, exactGridZ));
     }
 
+    /**
+     * @return {@code true} if the current column's mouth sample has a channel within the given normalized square
+     * distance of it (same semantics as {@link RiverInfo#normDistSq()}: 0 = channel center, ~1 = channel edge).
+     */
+    protected final boolean isNearMouthChannel(double maxNormDistSq)
+    {
+        if (riverMouthSample == null)
+        {
+            return false;
+        }
+        final RiverMouthChannelSample channel = riverMouthSample.channel();
+        if (channel == null)
+        {
+            return false;
+        }
+        final double width = channel.widthGrid() * riverMouthSample.context().worldgenScale();
+        return width > 0 && channel.distanceGrid() * channel.distanceGrid() < maxNormDistSq * width * width;
+    }
+
     private double adjustHeightForVolcanic(final double heightIn)
     {
         double volcanoHeight = NOT_PRESENT_RETURN;

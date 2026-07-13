@@ -213,3 +213,42 @@ Deviations / decisions:
   without consuming `next()`.
 
 ---
+
+## Phase 3 — DIAGNOSTIC one-channel fan + trunk continuity
+
+**This phase is a diagnostic milestone, not the feature** (per the design docs, a
+one-channel fan never satisfies the delta definition — Phase 4 adds the real
+distributaries).
+
+- Resolver builds a single trunk channel per qualifying mouth: the terminal
+  fractal's rendered course (source→drain is already upstream→seaward order),
+  plus a seaward extension from the graph drain, parallel to the mouth axis, to
+  just past the ocean-facing fan boundary — so the channel always reaches open
+  water. Flow per segment uses `MidpointFractal.calculateFlow`'s angle convention.
+- `.noRivers()` continuity, in the two places Phase 0 identified:
+  - `BiomeSourceExtension.getBiomeExtension`: in `.noRivers()` biomes, the river
+    biome overlay applies where the *resolved mouth channel* is within
+    `max(0.08 grid, half channel width)` — bound to the specific terminal network
+    via the resolver (a nearby unrelated river cannot trigger it).
+  - `ChunkNoiseFiller.updateLocalCaches`: local biome becomes RIVER near a mouth
+    channel (same `normDistSq < 1.1` rule as ordinary rivers), which also flips
+    `forceCoastalSaltWater` off there;
+    `sampleRiverData` injects mouth-channel `Flow` into the 5×5 quart flow grid
+    (`normDistSq < 0.28`, matching ordinary flow), so flowing river water is
+    placed through shore columns and out into the sea.
+- Debug command now dumps resolved mouth contexts and the per-position fan/channel
+  sample.
+- Automated Phase 3 gates in `DeltaWorldgenTest` (shared fixture, one region scan):
+  - trunk channel structure: exactly one branch-depth-0 channel, connected
+    segments, downstream flow, seaward endpoint past the fan boundary;
+  - **headless boat test**: every trunk-centerline column with fan weight ≥ 0.9 is
+    carved to ≤ sea level − 2 through the shore into the sea (the ordinary river
+    samplers are min-composed, so they can only deepen it);
+  - river biome overlay follows the channel through `.noRivers()` quarts and does
+    NOT leak sideways (2.5 channel-widths off-axis stays un-overlaid);
+  - anchors sit on the rendered coastline (land within 0.25 grid inland,
+    shore/ocean within 0.25 grid seaward) for every qualifying mouth found.
+- The in-game boat test + screenshots remain for a human pass (I cannot drive a
+  client); the checklist is at the end of this file.
+
+---

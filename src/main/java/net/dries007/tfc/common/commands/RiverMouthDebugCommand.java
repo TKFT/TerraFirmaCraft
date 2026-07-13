@@ -22,6 +22,9 @@ import net.dries007.tfc.world.biome.BiomeSourceExtension;
 import net.dries007.tfc.world.region.RegionPartition;
 import net.dries007.tfc.world.region.RiverEdge;
 import net.dries007.tfc.world.region.Units;
+import net.dries007.tfc.world.river.mouth.RiverMouthContext;
+import net.dries007.tfc.world.river.mouth.RiverMouthResolver;
+import net.dries007.tfc.world.river.mouth.RiverMouthSample;
 
 /**
  * TEMPORARY (river delta prototype) — diagnostic dump of terminal river edges, their drains, and the
@@ -81,7 +84,55 @@ public class RiverMouthDebugCommand
         {
             marchRawBiomes(source, biomeSource, terminals.get(0));
         }
+        dumpMouth(source, biomeSource, point, gridX, gridZ, terminals);
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static void dumpMouth(CommandSourceStack source, BiomeSourceExtension biomeSource, RegionPartition.Point point, double gridX, double gridZ, List<RiverEdge> terminals)
+    {
+        final RiverMouthResolver resolver = biomeSource.riverMouthResolver();
+        if (resolver == null)
+        {
+            source.sendSuccess(() -> Component.literal("No river mouth resolver on this biome source"), false);
+            return;
+        }
+
+        for (int i = 0; i < Math.min(4, terminals.size()); i++)
+        {
+            final int index = i;
+            final var mouth = resolver.resolve(terminals.get(i));
+            if (mouth.isEmpty())
+            {
+                source.sendSuccess(() -> Component.literal("Terminal[%d]: does not qualify as a delta".formatted(index)), false);
+                continue;
+            }
+            final RiverMouthContext context = mouth.get().context();
+            source.sendSuccess(() -> Component.literal(
+                "Terminal[%d]: %s delta, anchor grid (%.3f, %.3f) block (%d, %d), reach in/sea/half %.2f/%.2f/%.2f grid, %d channel(s), shapeSeed %d".formatted(
+                    index, context.tier(),
+                    context.anchorGridX(), context.anchorGridZ(),
+                    (int) (context.anchorGridX() * Units.GRID_WIDTH_IN_BLOCK), (int) (context.anchorGridZ() * Units.GRID_WIDTH_IN_BLOCK),
+                    context.inlandReachGrid(), context.seawardReachGrid(), context.fanHalfWidthGrid(),
+                    context.channels().size(), context.shapeSeed())), false);
+        }
+
+        final RiverMouthSample sample = resolver.sample(point, gridX, gridZ);
+        if (sample == null)
+        {
+            source.sendSuccess(() -> Component.literal("Here: outside every fan mask"), false);
+        }
+        else
+        {
+            final String channel = sample.channel() == null
+                ? "no channel near"
+                : "channel depth %d, dist %.1f blocks, width %.1f blocks, flow %s".formatted(
+                    sample.channel().channel().branchDepth(),
+                    sample.channel().distanceGrid() * Units.GRID_WIDTH_IN_BLOCK,
+                    sample.channel().widthGrid() * Units.GRID_WIDTH_IN_BLOCK,
+                    sample.channel().flow().getSerializedName());
+            source.sendSuccess(() -> Component.literal("Here: IN FAN, weight %.3f, along %.3f, across %.3f, %s".formatted(
+                sample.terrainWeight(), sample.alongGrid(), sample.acrossGrid(), channel)), false);
+        }
     }
 
     /**

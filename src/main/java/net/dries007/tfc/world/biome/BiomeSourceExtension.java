@@ -23,7 +23,9 @@ import net.dries007.tfc.world.region.RegionGenerator;
 import net.dries007.tfc.world.region.RegionPartition;
 import net.dries007.tfc.world.region.RiverEdge;
 import net.dries007.tfc.world.region.Units;
+import net.dries007.tfc.world.river.mouth.RiverMouthChannelSample;
 import net.dries007.tfc.world.river.mouth.RiverMouthResolver;
+import net.dries007.tfc.world.river.mouth.RiverMouthSample;
 import net.dries007.tfc.world.settings.Settings;
 
 public interface BiomeSourceExtension
@@ -50,6 +52,28 @@ public interface BiomeSourceExtension
                 if (edge.fractal().intersect(exactGridX, exactGridZ, 0.08f))
                 {
                     return TFCBiomes.RIVER;
+                }
+            }
+        }
+        else
+        {
+            // Terminal mouth channels continue through .noRivers() shore and ocean columns, so the river biome
+            // (and its flowing fresh water) reaches the sea. This is bound to the specific terminal mouth network
+            // through the resolver - a nearby unrelated river can never activate it.
+            final RiverMouthResolver resolver = riverMouthResolver();
+            if (resolver != null)
+            {
+                final double exactGridX = Units.quartToGridExact(quartX);
+                final double exactGridZ = Units.quartToGridExact(quartZ);
+                final RiverMouthSample mouth = resolver.sample(getPartition(QuartPos.toBlock(quartX), QuartPos.toBlock(quartZ)), exactGridX, exactGridZ);
+                if (mouth != null && mouth.channel() != null)
+                {
+                    final RiverMouthChannelSample channel = mouth.channel();
+                    final double halfWidth = 0.5 * channel.widthGrid() * mouth.context().worldgenScale();
+                    if (channel.distanceGrid() <= Math.max(0.08, halfWidth))
+                    {
+                        return TFCBiomes.RIVER;
+                    }
                 }
             }
         }

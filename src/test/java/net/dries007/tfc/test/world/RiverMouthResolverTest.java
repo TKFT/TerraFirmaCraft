@@ -181,7 +181,9 @@ public class RiverMouthResolverTest
         final RiverMouthSample sample = resolver.resolve(edge).orElseThrow().geometry().sample(context.anchorGridX(), context.anchorGridZ());
         assertNotNull(sample);
         assertEquals(1, sample.terrainWeight(), 1.0e-9);
-        assertNull(sample.channel()); // No channels exist yet in Phase 1
+        // The diagnostic trunk channel passes near the anchor
+        assertNotNull(sample.channel());
+        assertEquals(0, sample.channel().channel().branchDepth());
     }
 
     private RiverMouthContext assertQualifies(RiverMouthResolver resolver, RiverEdge edge)

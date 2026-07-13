@@ -11,12 +11,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 import com.google.common.collect.MapMaker;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 
 import net.dries007.tfc.world.biome.BiomeExtension;
 import net.dries007.tfc.world.region.RegionPartition;
 import net.dries007.tfc.world.region.RiverEdge;
 import net.dries007.tfc.world.region.Units;
+import net.dries007.tfc.world.river.Flow;
 import net.dries007.tfc.world.river.RiverHelpers;
 
 /**
@@ -161,9 +163,47 @@ public final class RiverMouthResolver
             normalizedRiverWidth,
             inlandReachGrid, seawardReachGrid, fanHalfWidthGrid,
             worldgenScale, shapeSeed,
-            List.of() // No channels yet - the diagnostic trunk channel and the distributary network come in later phases
+            buildTrunkChannel(edge, anchorX, anchorZ, inlandX, inlandZ, seawardReachGrid)
         );
         return Optional.of(new ResolvedMouth(context, new RiverMouthGeometry(context)));
+    }
+
+    /**
+     * DIAGNOSTIC (one-channel milestone): the mouth network is only the terminal trunk — the fractal's rendered
+     * course, plus a seaward extension from the graph drain to just past the fan's ocean-facing boundary, so the
+     * channel always reaches open water. The real distributary network replaces the single-channel list in the
+     * next phase; the trunk continuation stays branch depth 0.
+     */
+    private List<RiverMouthChannel> buildTrunkChannel(RiverEdge edge, double anchorX, double anchorZ, double inlandX, double inlandZ, double seawardReachGrid)
+    {
+        final double widthGrid = edge.width / (double) Units.GRID_WIDTH_IN_BLOCK;
+        final List<RiverMouthChannelSegment> segments = new ArrayList<>();
+
+        // The fractal runs source -> drain, which is already upstream -> seaward order
+        final double[] points = edge.fractal().segments;
+        for (int i = 0; i < points.length - 2; i += 2)
+        {
+            segments.add(segment(points[i], points[i + 1], points[i + 2], points[i + 3], widthGrid, widthGrid));
+        }
+
+        // Continue past the drain, parallel to the mouth axis, until just beyond the seaward fan boundary
+        final double drainX = edge.drain().x(), drainZ = edge.drain().y();
+        final double alongDrain = (drainX - anchorX) * inlandX + (drainZ - anchorZ) * inlandZ;
+        final double seawardEnd = -(seawardReachGrid + RiverMouthGeometry.BOUNDARY_NOISE_GRID + RiverMouthGeometry.FEATHER_GRID) * worldgenScale;
+        if (alongDrain > seawardEnd)
+        {
+            final double reach = alongDrain - seawardEnd;
+            segments.add(segment(drainX, drainZ, drainX - inlandX * reach, drainZ - inlandZ * reach, widthGrid, widthGrid));
+        }
+
+        return List.of(new RiverMouthChannel(List.copyOf(segments), widthGrid, widthGrid, 0));
+    }
+
+    private static RiverMouthChannelSegment segment(double startX, double startZ, double endX, double endZ, double startWidth, double endWidth)
+    {
+        // Same flow-angle convention as MidpointFractal.calculateFlow: grid +z is negated for the polar angle
+        final Flow flow = Flow.fromAngle(Mth.atan2(-(endZ - startZ), endX - startX));
+        return new RiverMouthChannelSegment(startX, startZ, endX, endZ, startWidth, endWidth, flow);
     }
 
     /**
