@@ -215,7 +215,12 @@ public class ChunkHeightFiller
 
         final RiverInfo info = sampleRiverInfo(useCache);
 
-        height = adjustHeightForRiverContributions(height, info);
+        // Inside the fan mask the mouth network owns river carving (mouth channel > terminal trunk > unrelated
+        // rivers): the ordinary pass would otherwise re-carve the trunk's replaced course below the bifurcation,
+        // cutting ghost waterways through islands. It fades back in through the feathered fan boundary, mirroring
+        // exactly how the density pass composes the delta contribution.
+        final double ordinaryHeight = adjustHeightForRiverContributions(height, info);
+        height = riverMouthWeight > 0 ? Mth.lerp(riverMouthWeight, ordinaryHeight, height) : ordinaryHeight;
 
         final double preVolcanicHeight = height;
 

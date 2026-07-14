@@ -672,11 +672,14 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
         final int localIndex = localX + 16 * localZ;
 
         localBiomesNoRivers[localIndex] = biomeAt;
+        // Inside the fan, the mouth's own edge is represented solely by its channel network - the ordinary
+        // overlay would otherwise mark the trunk's replaced course below the bifurcation as river
+        final boolean ordinaryRiverAt = info != null && info.normDistSq() < 1.1 && biomeAt.hasRivers()
+            && !(riverMouthWeight > 0 && riverMouthSample != null && info.edge() == riverMouthSample.context().edge());
         if (height <= SEA_LEVEL_Y + 1
-            && ((info != null && info.normDistSq() < 1.1 && biomeAt.hasRivers())
             // Terminal mouth channels overlay the river biome through .noRivers() shore and ocean columns,
             // bound to the specific mouth network resolved for this column
-            || isNearMouthChannel(1.1)))
+            && (ordinaryRiverAt || isNearMouthChannel(1.1)))
         {
             biomeAt = TFCBiomes.RIVER;
         }
@@ -744,25 +747,27 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
                     info = sampleRiverEdge(point);
                 }
 
-                riverFlows[quartX + 5 * quartZ] = info != null && info.normDistSq() < 0.28
-                    ? info.flow()
-                    : sampleMouthChannelFlow(point, chunkMinX + localX, chunkMinZ + localZ);
+                riverFlows[quartX + 5 * quartZ] = sampleFlow(point, info, chunkMinX + localX, chunkMinZ + localZ);
             }
         }
     }
 
     /**
-     * @return The flow of the terminal mouth channel near the given position, or {@link Flow#NONE}. Mouth channels
-     * supply flow through .noRivers() shore and ocean columns, where the ordinary river data has none - this is
-     * what keeps river water flowing from the trunk out to the sea.
+     * The flow for a quart point. Mouth channels supply flow through .noRivers() shore and ocean columns, where
+     * the ordinary river data has none - this is what keeps river water flowing from the trunk out to the sea.
+     * Inside the fan, the mouth's own edge defers entirely to its channel network, so the trunk's replaced course
+     * below the bifurcation carries no stray flow.
      */
-    private Flow sampleMouthChannelFlow(RegionPartition.Point point, int blockX, int blockZ)
+    private Flow sampleFlow(RegionPartition.Point point, @Nullable RiverInfo info, int blockX, int blockZ)
     {
-        if (riverMouthResolver == null)
+        final RiverMouthSample mouth = riverMouthResolver == null
+            ? null
+            : riverMouthResolver.sample(point, Units.blockToGridExact(blockX), Units.blockToGridExact(blockZ));
+
+        if (info != null && info.normDistSq() < 0.28 && !(mouth != null && info.edge() == mouth.context().edge()))
         {
-            return Flow.NONE;
+            return info.flow();
         }
-        final RiverMouthSample mouth = riverMouthResolver.sample(point, Units.blockToGridExact(blockX), Units.blockToGridExact(blockZ));
         if (mouth == null || mouth.channel() == null)
         {
             return Flow.NONE;

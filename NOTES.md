@@ -252,3 +252,45 @@ distributaries).
   client); the checklist is at the end of this file.
 
 ---
+
+## Phase 4 — Real distributaries (the feature definition)
+
+Network construction in `RiverMouthResolver.buildChannels`, all jitter from
+`shapeSeed` hashes with distinct salts:
+
+- **Bifurcation apex** on the rendered trunk course (fractal point nearest a
+  seeded 0.20–0.45 × inland-reach target), so the first split is visible from the
+  river and connected to the real trunk course exactly.
+- **Dominant channel** (index 0, branch depth 0): the fractal course up to the
+  apex, then apex → mid → seaward-end with mild seeded bend, tapering to 0.85×
+  trunk width. This is the boat route — it keeps full trunk depth via the
+  width-scaled sampler.
+- **Secondaries** (branch depth 1): split from *staggered* seeded points along
+  the dominant path (t = 0.15–0.60) — not a single radial apex — each with two
+  bent segments to the ocean-facing boundary, widths 0.40–0.60 × trunk (unequal,
+  ≥ 4 blocks), tapering to 0.6× by the mouth. Lateral endpoint slots alternate
+  flanks in disjoint magnitude bands (0.42–0.57, 0.80–0.95 × fan half-width) with
+  per-mouth handedness flip, so same-side channels keep ≥ ~0.23 half-widths of
+  island between them.
+- Counts (locked table): compact 2; normal 2–4; major 3–4 with a 12% fifth.
+- Carve/flow/water/biome-overlay all ride the Phase 3 plumbing unchanged — the
+  sampler consumes the nearest channel as `RiverInfo` (per-channel width ⇒
+  per-channel depth/levee automatically), flow comes from channel segments,
+  water + overlay from the channel-distance rules. No "painted strips": every
+  channel is carved, flowing, and water-bearing by construction of that plumbing.
+- New/updated automated gates: network structure (counts in tier range,
+  connectivity of every secondary onto the dominant path, downstream flow, every
+  endpoint past the seaward boundary, unequal widths), islands ≥ sea−2 between
+  adjacent well-separated channels just seaward of the coastline, boat test still
+  on the dominant channel, determinism via context equality across resolver
+  instances (channels included).
+- **Overlap priority fix (found by the islands gate):** the ordinary river pass
+  was re-carving the mouth edge's *replaced* course below the bifurcation apex,
+  cutting a ghost waterway through islands. Fix per impl plan §4.5 / sampler doc
+  §5: inside the fan mask the mouth network owns river behavior — the ordinary
+  height carve lerps out by the mask weight (mirroring the density-pass
+  composition), and the mouth's own edge is excluded from the ordinary river
+  biome overlay and quart flow (channel network supplies both). Unrelated rivers
+  keep normal behavior; outside masks everything is bit-identical as before.
+
+---

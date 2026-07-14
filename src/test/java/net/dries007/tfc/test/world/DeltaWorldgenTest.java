@@ -134,37 +134,158 @@ public class DeltaWorldgenTest implements TestSetup
     }
 
     @Test
-    public void testTrunkChannelStructure()
+    public void testDistributaryNetworkStructure()
     {
         for (RiverMouthResolver.ResolvedMouth mouth : fixture().mouths)
         {
             final RiverMouthContext context = mouth.context();
-            assertEquals(1, context.channels().size(), "Diagnostic phase: the network is exactly the trunk");
+            final List<RiverMouthChannel> channels = context.channels();
 
-            final RiverMouthChannel trunk = context.channels().get(0);
-            assertEquals(0, trunk.branchDepth());
-            assertFalse(trunk.segments().isEmpty());
+            // Channel count within the locked tier range (compact 2, normal 2-4, major 3-4 with rare 5th)
+            assertTrue(channels.size() >= context.tier().minDistributaries() && channels.size() <= context.tier().maxDistributaries(),
+                context.tier() + " delta has " + channels.size() + " channels");
 
-            // The channel's seaward endpoint reaches past the ocean-facing fan boundary
-            final RiverMouthChannelSegment last = trunk.segments().get(trunk.segments().size() - 1);
-            final double alongEnd = (last.endGridX() - context.anchorGridX()) * context.inlandUnitX()
-                + (last.endGridZ() - context.anchorGridZ()) * context.inlandUnitZ();
-            assertTrue(alongEnd <= -context.seawardReachGrid() * context.worldgenScale(),
-                "Trunk ends at along " + alongEnd + ", before the seaward boundary " + -context.seawardReachGrid());
+            final RiverMouthChannel dominant = channels.get(0);
+            assertEquals(0, dominant.branchDepth());
+            assertFalse(dominant.segments().isEmpty());
 
-            // Segments are connected, upstream to seaward, and every segment has downstream flow
-            for (int i = 0; i < trunk.segments().size(); i++)
+            for (RiverMouthChannel channel : channels)
             {
-                final RiverMouthChannelSegment segment = trunk.segments().get(i);
-                assertNotEquals(Flow.NONE, segment.flow());
-                if (i > 0)
+                // Every channel's seaward endpoint reaches past the ocean-facing fan boundary
+                final RiverMouthChannelSegment last = channel.segments().get(channel.segments().size() - 1);
+                final double alongEnd = (last.endGridX() - context.anchorGridX()) * context.inlandUnitX()
+                    + (last.endGridZ() - context.anchorGridZ()) * context.inlandUnitZ();
+                assertTrue(alongEnd <= -context.seawardReachGrid() * context.worldgenScale(),
+                    "Channel ends at along " + alongEnd + ", before the seaward boundary " + -context.seawardReachGrid());
+
+                // Segments are connected, upstream to seaward, and every segment has downstream flow
+                for (int i = 0; i < channel.segments().size(); i++)
                 {
-                    final RiverMouthChannelSegment previous = trunk.segments().get(i - 1);
-                    assertEquals(previous.endGridX(), segment.startGridX(), 1.0e-9);
-                    assertEquals(previous.endGridZ(), segment.startGridZ(), 1.0e-9);
+                    final RiverMouthChannelSegment segment = channel.segments().get(i);
+                    assertNotEquals(Flow.NONE, segment.flow());
+                    if (i > 0)
+                    {
+                        final RiverMouthChannelSegment previous = channel.segments().get(i - 1);
+                        assertEquals(previous.endGridX(), segment.startGridX(), 1.0e-9);
+                        assertEquals(previous.endGridZ(), segment.startGridZ(), 1.0e-9);
+                    }
+                }
+
+                if (channel != dominant)
+                {
+                    // Secondaries are narrower than the trunk, and connect to the dominant path
+                    assertEquals(1, channel.branchDepth());
+                    assertTrue(channel.startWidthGrid() < dominant.startWidthGrid(),
+                        "Secondary as wide as the trunk: " + channel.startWidthGrid());
+
+                    final RiverMouthChannelSegment first = channel.segments().get(0);
+                    double minDistSq = Double.MAX_VALUE;
+                    for (RiverMouthChannelSegment segment : dominant.segments())
+                    {
+                        minDistSq = Math.min(minDistSq, segment.distanceSqGrid(first.startGridX(), first.startGridZ()));
+                    }
+                    assertTrue(minDistSq < 1.0e-9, "Secondary does not start on the dominant path: distSq " + minDistSq);
                 }
             }
+
+            // Unequal network: with two or more secondaries, their widths must not all be identical
+            if (channels.size() >= 3)
+            {
+                boolean anyDifferent = false;
+                for (int i = 2; i < channels.size() && !anyDifferent; i++)
+                {
+                    anyDifferent = Math.abs(channels.get(i).startWidthGrid() - channels.get(1).startWidthGrid()) > 1.0e-6;
+                }
+                assertTrue(anyDifferent, "All secondary widths identical");
+            }
         }
+    }
+
+    @Test
+    public void testIslandsBetweenChannels()
+    {
+        // Between laterally adjacent channels, the land must rise well above the channel floors - the delta is
+        // channels between islands, not one merged waterway
+        final Fixture fixture = fixture();
+        final Map<ChunkPos, ChunkHeightFiller> fillers = new HashMap<>();
+        int islandsChecked = 0;
+
+        for (RiverMouthResolver.ResolvedMouth mouth : fixture.mouths)
+        {
+            final RiverMouthContext context = mouth.context();
+            if (context.channels().size() < 2)
+            {
+                continue;
+            }
+            // Just seaward of the rendered coastline: most channels have bifurcated, and the plain here is not
+            // yet limited by the deep-water build cap
+            final double along = -0.25 * context.seawardReachGrid() * context.worldgenScale();
+
+            // Where each channel crosses this along-line, in across coordinates, paired with its local width
+            final List<double[]> crossings = new ArrayList<>();
+            for (RiverMouthChannel channel : context.channels())
+            {
+                final double[] crossing = crossingAt(context, channel, along);
+                if (crossing != null)
+                {
+                    crossings.add(crossing);
+                }
+            }
+            crossings.sort((a, b) -> Double.compare(a[0], b[0]));
+
+            for (int i = 0; i + 1 < crossings.size(); i++)
+            {
+                final double[] left = crossings.get(i), right = crossings.get(i + 1);
+                final double gap = right[0] - left[0];
+                // An island (plain regime) is only guaranteed when the midpoint sits >= 1.6 normalized widths
+                // from BOTH channels - i.e. beyond the wider channel's bed and levee bands. Closer pairs (near a
+                // bifurcation, or beside the wide trunk) legitimately show only levees between them.
+                if (gap < 3.2 * Math.max(left[1], right[1]))
+                {
+                    continue;
+                }
+
+                final double midAcross = 0.5 * (left[0] + right[0]);
+                final double gridX = context.anchorGridX() + context.inlandUnitX() * along - context.inlandUnitZ() * midAcross;
+                final double gridZ = context.anchorGridZ() + context.inlandUnitZ() * along + context.inlandUnitX() * midAcross;
+                final RiverMouthSample sample = mouth.geometry().sample(gridX, gridZ);
+                if (sample == null || sample.terrainWeight() < 0.9)
+                {
+                    continue;
+                }
+
+                final int blockX = (int) Math.round(gridX * Units.GRID_WIDTH_IN_BLOCK);
+                final int blockZ = (int) Math.round(gridZ * Units.GRID_WIDTH_IN_BLOCK);
+                final ChunkHeightFiller filler = fillers.computeIfAbsent(new ChunkPos(blockX >> 4, blockZ >> 4), pos -> fixture.stack.createHeightFiller(pos, true));
+                final double height = filler.sampleHeight(blockX, blockZ);
+
+                assertTrue(height >= TFCChunkGenerator.SEA_LEVEL_Y - 2,
+                    "No island between channels at (" + blockX + ", " + blockZ + "): height " + height);
+                islandsChecked++;
+            }
+        }
+        assertTrue(islandsChecked > 0, "Never found separated adjacent channels to check for islands");
+    }
+
+    /**
+     * @return {@code [across, widthGrid]} where the channel's centerline crosses the given along-line, or null.
+     */
+    private double @Nullable [] crossingAt(RiverMouthContext context, RiverMouthChannel channel, double along)
+    {
+        for (RiverMouthChannelSegment segment : channel.segments())
+        {
+            final double startAlong = (segment.startGridX() - context.anchorGridX()) * context.inlandUnitX() + (segment.startGridZ() - context.anchorGridZ()) * context.inlandUnitZ();
+            final double endAlong = (segment.endGridX() - context.anchorGridX()) * context.inlandUnitX() + (segment.endGridZ() - context.anchorGridZ()) * context.inlandUnitZ();
+            if ((startAlong >= along) != (endAlong >= along) && Math.abs(endAlong - startAlong) > 1.0e-9)
+            {
+                final double t = (along - startAlong) / (endAlong - startAlong);
+                final double startAcross = (segment.startGridX() - context.anchorGridX()) * -context.inlandUnitZ() + (segment.startGridZ() - context.anchorGridZ()) * context.inlandUnitX();
+                final double endAcross = (segment.endGridX() - context.anchorGridX()) * -context.inlandUnitZ() + (segment.endGridZ() - context.anchorGridZ()) * context.inlandUnitX();
+                final double width = segment.startWidthGrid() + t * (segment.endWidthGrid() - segment.startWidthGrid());
+                return new double[] {startAcross + t * (endAcross - startAcross), width * context.worldgenScale()};
+            }
+        }
+        return null;
     }
 
     @Test

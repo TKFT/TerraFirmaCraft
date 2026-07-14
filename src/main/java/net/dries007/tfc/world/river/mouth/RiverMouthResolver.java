@@ -163,40 +163,142 @@ public final class RiverMouthResolver
             normalizedRiverWidth,
             inlandReachGrid, seawardReachGrid, fanHalfWidthGrid,
             worldgenScale, shapeSeed,
-            buildTrunkChannel(edge, anchorX, anchorZ, inlandX, inlandZ, seawardReachGrid)
+            buildChannels(edge, tier.get(), shapeSeed, anchorX, anchorZ, inlandX, inlandZ, inlandReachGrid, seawardReachGrid, fanHalfWidthGrid)
         );
         return Optional.of(new ResolvedMouth(context, new RiverMouthGeometry(context)));
     }
 
     /**
-     * DIAGNOSTIC (one-channel milestone): the mouth network is only the terminal trunk — the fractal's rendered
-     * course, plus a seaward extension from the graph drain to just past the fan's ocean-facing boundary, so the
-     * channel always reaches open water. The real distributary network replaces the single-channel list in the
-     * next phase; the trunk continuation stays branch depth 0.
+     * Builds the deterministic distributary network. The dominant channel (branch depth 0, index 0) is the trunk's
+     * continuation: the terminal fractal's rendered course up to the bifurcation apex in the upper-middle fan, then
+     * a gently bent path to just past the ocean-facing boundary, so a boat can always pass ocean → river. Secondary
+     * distributaries (branch depth 1) split from staggered points along the dominant path with seeded jitter on
+     * split positions, directions, and widths — narrower and less direct than the trunk, unequal to each other,
+     * laterally spaced so readable islands survive between the channels. All endpoints reach past the seaward fan
+     * boundary into (classifier-guaranteed) shallow ocean.
      */
-    private List<RiverMouthChannel> buildTrunkChannel(RiverEdge edge, double anchorX, double anchorZ, double inlandX, double inlandZ, double seawardReachGrid)
+    private List<RiverMouthChannel> buildChannels(RiverEdge edge, DeltaTier tier, long seed, double anchorX, double anchorZ, double inlandX, double inlandZ, double inlandReachGrid, double seawardReachGrid, double fanHalfWidthGrid)
     {
-        final double widthGrid = edge.width / (double) Units.GRID_WIDTH_IN_BLOCK;
-        final List<RiverMouthChannelSegment> segments = new ArrayList<>();
-
-        // The fractal runs source -> drain, which is already upstream -> seaward order
-        final double[] points = edge.fractal().segments;
-        for (int i = 0; i < points.length - 2; i += 2)
-        {
-            segments.add(segment(points[i], points[i + 1], points[i + 2], points[i + 3], widthGrid, widthGrid));
-        }
-
-        // Continue past the drain, parallel to the mouth axis, until just beyond the seaward fan boundary
-        final double drainX = edge.drain().x(), drainZ = edge.drain().y();
-        final double alongDrain = (drainX - anchorX) * inlandX + (drainZ - anchorZ) * inlandZ;
+        final double trunkWidth = edge.width / (double) Units.GRID_WIDTH_IN_BLOCK;
+        final double halfWidth = fanHalfWidthGrid * worldgenScale;
         final double seawardEnd = -(seawardReachGrid + RiverMouthGeometry.BOUNDARY_NOISE_GRID + RiverMouthGeometry.FEATHER_GRID) * worldgenScale;
-        if (alongDrain > seawardEnd)
+
+        // --- The bifurcation apex: the point on the rendered trunk course nearest the target depth into the fan
+        final double apexAlongTarget = (0.20 + 0.25 * RiverMouthRandom.hash01(seed, 23)) * inlandReachGrid * worldgenScale;
+        final double[] points = edge.fractal().segments;
+        int apexIndex = points.length - 2;
+        for (int i = points.length - 2; i >= 0; i -= 2)
         {
-            final double reach = alongDrain - seawardEnd;
-            segments.add(segment(drainX, drainZ, drainX - inlandX * reach, drainZ - inlandZ * reach, widthGrid, widthGrid));
+            apexIndex = i;
+            final double along = (points[i] - anchorX) * inlandX + (points[i + 1] - anchorZ) * inlandZ;
+            if (along >= apexAlongTarget)
+            {
+                break;
+            }
+        }
+        final double apexX = points[apexIndex], apexZ = points[apexIndex + 1];
+        final double apexAlong = (apexX - anchorX) * inlandX + (apexZ - anchorZ) * inlandZ;
+        final double apexAcross = (apexX - anchorX) * -inlandZ + (apexZ - anchorZ) * inlandX;
+
+        // --- The dominant channel: trunk course upstream of the apex, then apex -> mid -> seaward end
+        final List<RiverMouthChannelSegment> dominant = new ArrayList<>();
+        for (int i = 0; i < apexIndex; i += 2)
+        {
+            dominant.add(segment(points[i], points[i + 1], points[i + 2], points[i + 3], trunkWidth, trunkWidth));
+        }
+        final double dominantEndAcross = apexAcross * 0.3 + RiverMouthRandom.hash11(seed, 22) * 0.15 * halfWidth;
+        final double[] apex = {apexX, apexZ};
+        final double[] dominantMid = position(anchorX, anchorZ, inlandX, inlandZ,
+            0.5 * (apexAlong + seawardEnd),
+            0.5 * (apexAcross + dominantEndAcross) + RiverMouthRandom.hash11(seed, 70) * 0.10 * halfWidth);
+        final double[] dominantEnd = position(anchorX, anchorZ, inlandX, inlandZ, seawardEnd, dominantEndAcross);
+        dominant.add(segment(apex[0], apex[1], dominantMid[0], dominantMid[1], trunkWidth, 0.92 * trunkWidth));
+        dominant.add(segment(dominantMid[0], dominantMid[1], dominantEnd[0], dominantEnd[1], 0.92 * trunkWidth, 0.85 * trunkWidth));
+
+        final List<RiverMouthChannel> channels = new ArrayList<>();
+        channels.add(new RiverMouthChannel(List.copyOf(dominant), trunkWidth, 0.85 * trunkWidth, 0));
+
+        // --- Secondary distributaries, splitting from staggered points on the dominant path
+        final double[] slots = secondarySlots(distributaryCount(tier, seed) - 1, seed);
+        for (int i = 0; i < slots.length; i++)
+        {
+            final double splitT = 0.15 + 0.45 * RiverMouthRandom.hash01(seed, 90 + i);
+            final double[] split = pointOnPath(apex, dominantMid, dominantEnd, splitT);
+            final double splitAlong = (split[0] - anchorX) * inlandX + (split[1] - anchorZ) * inlandZ;
+            final double splitAcross = (split[0] - anchorX) * -inlandZ + (split[1] - anchorZ) * inlandX;
+
+            final double endAcross = slots[i] * halfWidth;
+            final double startWidth = Math.max(trunkWidth * (0.40 + 0.20 * RiverMouthRandom.hash01(seed, 50 + i)), 4.0 / Units.GRID_WIDTH_IN_BLOCK);
+            final double endWidth = 0.6 * startWidth;
+
+            final double[] mid = position(anchorX, anchorZ, inlandX, inlandZ,
+                0.5 * (splitAlong + seawardEnd),
+                0.5 * (splitAcross + endAcross) + RiverMouthRandom.hash11(seed, 71 + i) * 0.10 * halfWidth);
+            final double[] end = position(anchorX, anchorZ, inlandX, inlandZ, seawardEnd, endAcross);
+
+            channels.add(new RiverMouthChannel(List.of(
+                segment(split[0], split[1], mid[0], mid[1], startWidth, 0.8 * startWidth),
+                segment(mid[0], mid[1], end[0], end[1], 0.8 * startWidth, endWidth)
+            ), startWidth, endWidth, 1));
         }
 
-        return List.of(new RiverMouthChannel(List.copyOf(segments), widthGrid, widthGrid, 0));
+        return List.copyOf(channels);
+    }
+
+    /**
+     * @return The total downstream channel count for the tier: compact always 2, normal 2–4, major 3–4 with a
+     * rare fifth (locked dimensions table, RIVER_DELTA_DESIGN.md §2).
+     */
+    private static int distributaryCount(DeltaTier tier, long seed)
+    {
+        return switch (tier)
+        {
+            case COMPACT -> 2;
+            case NORMAL -> 2 + (int) (3 * RiverMouthRandom.hash01(seed, 20));
+            case MAJOR -> RiverMouthRandom.hash01(seed, 21) < 0.12 ? 5 : 3 + (int) (2 * RiverMouthRandom.hash01(seed, 20));
+        };
+    }
+
+    /**
+     * Lateral endpoint positions for the secondary distributaries, as signed fractions of the fan half-width.
+     * Slots alternate sides at staggered magnitudes with bounded jitter, so minimum spacing (readable islands)
+     * holds by construction; overall handedness flips per mouth.
+     */
+    private static double[] secondarySlots(int count, long seed)
+    {
+        final double flip = RiverMouthRandom.hash01(seed, 24) < 0.5 ? 1 : -1;
+        final double[] slots = new double[count];
+        for (int i = 0; i < count; i++)
+        {
+            // 1st: near one flank; 2nd: opposite flank; 3rd/4th: outer flanks. Magnitude bands are disjoint by
+            // >= 0.23 of the half-width, so same-side channels keep readable islands between them.
+            final double magnitude = switch (i)
+            {
+                case 0, 1 -> 0.42 + 0.15 * RiverMouthRandom.hash01(seed, 30 + i);
+                default -> 0.80 + 0.15 * RiverMouthRandom.hash01(seed, 30 + i);
+            };
+            final double side = (i % 2 == 0 ? 1 : -1) * flip;
+            slots[i] = side * magnitude;
+        }
+        return slots;
+    }
+
+    private static double[] position(double anchorX, double anchorZ, double inlandX, double inlandZ, double along, double across)
+    {
+        return new double[] {
+            anchorX + inlandX * along - inlandZ * across,
+            anchorZ + inlandZ * along + inlandX * across
+        };
+    }
+
+    /**
+     * @return The point at parameter {@code t} in [0, 1] along the two-segment path {@code start -> mid -> end}.
+     */
+    private static double[] pointOnPath(double[] start, double[] mid, double[] end, double t)
+    {
+        return t < 0.5
+            ? new double[] {Mth.lerp(2 * t, start[0], mid[0]), Mth.lerp(2 * t, start[1], mid[1])}
+            : new double[] {Mth.lerp(2 * t - 1, mid[0], end[0]), Mth.lerp(2 * t - 1, mid[1], end[1])};
     }
 
     private static RiverMouthChannelSegment segment(double startX, double startZ, double endX, double endZ, double startWidth, double endWidth)
