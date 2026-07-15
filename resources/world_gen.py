@@ -64,7 +64,7 @@ def generate(rm: ResourceManager):
     rm.placed_feature_tag('feature/clay_indicators', 'tfc:plant/athyrium_fern_patch', 'tfc:plant/canna_patch', 'tfc:plant/goldenrod_patch', 'tfc:plant/pampas_grass_patch', 'tfc:plant/perovskia_patch', 'tfc:plant/water_canna_patch', 'tfc:plant/rose_patch')
     rm.placed_feature_tag('feature/surface_grasses', *['tfc:plant/%s_patch' % p for p, data in PLANTS.items() if data.type == 'short_grass'])
     rm.placed_feature_tag('feature/boulders', 'tfc:raw_boulder', 'tfc:cobble_boulder', 'tfc:mossy_boulder', 'tfc:raw_boulder_small_patch', 'tfc:cobble_boulder_small_patch', 'tfc:mossy_boulder_small_patch')
-    rm.placed_feature_tag('feature/soil_discs', 'tfc:clay_disc_with_indicator', 'tfc:water_clay_disc_with_indicator', 'tfc:peat_disc', 'tfc:powder_snow', 'tfc:rooted_dirt', 'tfc:mollisol_disc') # Does not include alfisol/podzol discs as those are placed per tree by the forest feature
+    rm.placed_feature_tag('feature/soil_discs', 'tfc:clay_disc_with_indicator', 'tfc:water_clay_disc_with_indicator', 'tfc:delta_clay_disc_with_indicator', 'tfc:peat_disc', 'tfc:powder_snow', 'tfc:rooted_dirt', 'tfc:mollisol_disc') # Does not include alfisol/podzol discs as those are placed per tree by the forest feature
     rm.placed_feature_tag('feature/stratovolcanoes', 'tfc:stratovolcano_pumice', 'tfc:fuji_caldera', 'tfc:fuji_spring', 'tfc:kelimutu_lava', 'tfc:kelimutu_spring_water', 'tfc:kelimutu_water', 'tfc:tahoma_caldera', 'tfc:tahoma_spring', 'tfc:wizard_island_lava', 'tfc:wizard_island_spring', 'tfc:random_fuji_fissure', 'tfc:random_fuji_spring_water_fissure', 'tfc:random_tahoma_fissure', 'tfc:random_tahoma_spring_water_fissure', 'tfc:random_kelimutu_fissure', 'tfc:random_kelimutu_spring_water_fissure', 'tfc:random_crater_lake_fissure', 'tfc:random_crater_lake_spring_water_fissure', 'tfc:fuji_rivulet', 'tfc:tahoma_rivulet', 'tfc:crater_lake_rivulet', 'tfc:crater_lake_sulfur')
     rm.placed_feature_tag('feature/cinder_cones', 'tfc:volcano_rivulet', 'tfc:volcano_caldera', 'tfc:random_volcano_fissure', 'tfc:cinder_cone_pumice')
     rm.placed_feature_tag('feature/volcanic', 'tfc:lava_surface_spring')
@@ -282,6 +282,20 @@ def generate(rm: ResourceManager):
         'min_radius': 2,
         'max_radius': 3,
         'height': 2,
+        'states': water_clay
+    })
+
+    # Delta clay boost: terminal river mouths (deltas) are a reliable early-game clay source, not a lottery.
+    # The wet flat placement modifier restricts placement to the delta's silt/mud plain between distributaries;
+    # the count below is the tunable boost rate (attempts per chunk touching a delta).
+    configured_placed_feature(rm, 'delta_clay_disc_with_indicator', 'tfc:if_then', {
+        'if': 'tfc:delta_clay_disc',
+        'then': 'tfc:clay_indicator'
+    }, decorate_count(2), decorate_square(), decorate_heightmap('world_surface_wg'), {'type': 'tfc:river_mouth_wet_flat'})
+    configured_placed_feature(rm, 'delta_clay_disc', 'tfc:soil_disc', {
+        'min_radius': 3,
+        'max_radius': 5,
+        'height': 3,
         'states': water_clay
     })
 

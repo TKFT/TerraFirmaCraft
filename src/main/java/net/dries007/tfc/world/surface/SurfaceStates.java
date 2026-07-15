@@ -94,6 +94,7 @@ public final class SurfaceStates
     public static final SurfaceState ATOLL_GRASS_TO_WHITE_SAND = SoilSurfaceState.buildSiltySurfaceType(SoilBlockType.GRASS, SurfaceStates.WHITE_SAND);
     public static final SurfaceState ATOLL_GRASS_TO_YELLOW_SAND = SoilSurfaceState.buildSiltySurfaceType(SoilBlockType.GRASS, SurfaceStates.YELLOW_SAND);
     public static final SurfaceState ATOLL_GRASS_TO_PINK_SAND = SoilSurfaceState.buildSiltySurfaceType(SoilBlockType.GRASS, SurfaceStates.PINK_SAND);
+    public static final SurfaceState SILTY_GRASS = SoilSurfaceState.buildSiltySurfaceType(SoilBlockType.GRASS, SurfaceStates.SAND);
     public static final SurfaceState MID_DIRT_TO_GRAVEL = SoilSurfaceState.buildMidType(SoilBlockType.DIRT, SurfaceStates.GRAVEL);
     public static final SurfaceState MID_DIRT_TO_SAND = SoilSurfaceState.buildMidType(SoilBlockType.DIRT, SurfaceStates.SAND);
     public static final SurfaceState VOLCANIC_TOP_GRASS_TO_GRAVEL = SoilSurfaceState.buildVolcanicSurfaceType(SoilBlockType.GRASS, SurfaceStates.BASALT_GRAVEL);

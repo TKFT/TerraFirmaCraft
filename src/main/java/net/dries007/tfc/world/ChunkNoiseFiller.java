@@ -6,6 +6,7 @@
 
 package net.dries007.tfc.world;
 
+import java.util.Arrays;
 import java.util.Map;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import net.minecraft.Util;
@@ -47,6 +48,7 @@ import net.dries007.tfc.world.river.mouth.RiverMouthChannelSample;
 import net.dries007.tfc.world.river.mouth.RiverMouthSample;
 import net.dries007.tfc.world.shore.ShoreBlendType;
 import net.dries007.tfc.world.shore.ShoreNoiseSampler;
+import net.dries007.tfc.world.surface.RiverMouthSurface;
 import net.dries007.tfc.world.volcano.CenteredFeatureBlendType;
 import net.dries007.tfc.world.volcano.CenteredFeatureNoiseSampler;
 
@@ -111,6 +113,8 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
     private final BiomeExtension[] localBiomes; // 16x16, block pos resolution
     private final BiomeExtension[] localBiomesNoRivers; // 16x16, block pos resolution
     private final double[] localBiomeWeights; // 16x16, block pos resolution
+    private final RiverMouthSurface.Band[] mouthSurfaceBands; // 16x16, block pos resolution
+    private final double[] mouthSurfaceWeights; // 16x16, block pos resolution
 
     // Current local position / context
     private double cellDeltaX, cellDeltaZ; // Delta within a noise cell
@@ -171,6 +175,9 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
         this.localBiomes = new BiomeExtension[16 * 16];
         this.localBiomesNoRivers = new BiomeExtension[16 * 16];
         this.localBiomeWeights = new double[16 * 16];
+        this.mouthSurfaceBands = new RiverMouthSurface.Band[16 * 16];
+        this.mouthSurfaceWeights = new double[16 * 16];
+        Arrays.fill(mouthSurfaceBands, RiverMouthSurface.Band.NONE);
     }
 
     public TFCAquifer aquifer()
@@ -206,6 +213,16 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
     public double[] localBiomeWeights()
     {
         return localBiomeWeights;
+    }
+
+    public RiverMouthSurface.Band[] mouthSurfaceBands()
+    {
+        return mouthSurfaceBands;
+    }
+
+    public double[] mouthSurfaceWeights()
+    {
+        return mouthSurfaceWeights;
     }
 
     /**
@@ -670,6 +687,11 @@ public class ChunkNoiseFiller extends ChunkHeightFiller
     protected void updateLocalCaches(Object2DoubleMap<BiomeExtension> biomeWeights, BiomeExtension biomeAt, @Nullable RiverInfo info, double height, double preVolcanicHeight, boolean couldBeSalty, int surfaceIntegrityDepth)
     {
         final int localIndex = localX + 16 * localZ;
+
+        // Surface band for the mouth network, classified against the carved height so the surface stage reuses
+        // the exact per-column sample this pass already resolved (impl plan §4.6)
+        mouthSurfaceBands[localIndex] = RiverMouthSurface.classify(riverMouthSample, height, SEA_LEVEL_Y);
+        mouthSurfaceWeights[localIndex] = riverMouthWeight;
 
         localBiomesNoRivers[localIndex] = biomeAt;
         // Inside the fan, the mouth's own edge is represented solely by its channel network - the ordinary

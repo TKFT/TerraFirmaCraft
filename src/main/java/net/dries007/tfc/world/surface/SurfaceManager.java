@@ -38,13 +38,17 @@ public final class SurfaceManager
     }
 
     private final Map<BiomeExtension, SurfaceBuilder> builders;
+    private final RiverMouthSurface mouthSurface;
 
     public SurfaceManager(Seed seed)
     {
+        // Order matters: the mouth surface consumes its seeds after every biome builder, keeping their noise
+        // seeds - and so every surface outside a mouth's fan mask - identical to before
         this.builders = collectSurfaceBuilders(seed);
+        this.mouthSurface = new RiverMouthSurface(seed);
     }
 
-    public void buildSurface(LevelAccessor world, ChunkAccess chunk, RockLayerSettings rockLayerSettings, ChunkData chunkData, BiomeExtension[] accurateChunkBiomes, BiomeExtension[] accurateChunkBiomesNoRivers, double[] accurateChunkBiomeWeights, double[] slopeMap, int[] preVolcanicHeights, RandomSource random, int seaLevel, int minY, BiomeExtension cinderConeBiome, BiomeExtension tuffRingBiome, BiomeExtension tuyaBiome, BiomeExtension atollBiome, BiomeExtension stratovolcanoBiome)
+    public void buildSurface(LevelAccessor world, ChunkAccess chunk, RockLayerSettings rockLayerSettings, ChunkData chunkData, BiomeExtension[] accurateChunkBiomes, BiomeExtension[] accurateChunkBiomesNoRivers, double[] accurateChunkBiomeWeights, RiverMouthSurface.Band[] mouthSurfaceBands, double[] mouthSurfaceWeights, double[] slopeMap, int[] preVolcanicHeights, RandomSource random, int seaLevel, int minY, BiomeExtension cinderConeBiome, BiomeExtension tuffRingBiome, BiomeExtension tuyaBiome, BiomeExtension atollBiome, BiomeExtension stratovolcanoBiome)
     {
         final boolean debugSlope = false;
 
@@ -71,7 +75,15 @@ public final class SurfaceManager
 
                 final int preVolcanicHeight = preVolcanicHeights[x + 16 * z];
 
-                context.buildSurface(biome, originalBiome, weight, biome.isSalty(), builder, blockX + x, y, blockZ + z, slope, preVolcanicHeight);
+                // Inside a terminal mouth's fan mask, the mouth-aware wrapper replaces the biome's surface with
+                // the band's delta materials, feathering back to the biome builder through the mask boundary
+                final RiverMouthSurface.Band band = mouthSurfaceBands[x + 16 * z];
+                final double mouthWeight = mouthSurfaceWeights[x + 16 * z];
+                final SurfaceBuilder actualBuilder = band == RiverMouthSurface.Band.NONE
+                    ? builder
+                    : (ctx, startY, endY) -> mouthSurface.buildSurface(ctx, band, mouthWeight, builder, startY, endY);
+
+                context.buildSurface(biome, originalBiome, weight, biome.isSalty(), actualBuilder, blockX + x, y, blockZ + z, slope, preVolcanicHeight);
             }
         }
     }

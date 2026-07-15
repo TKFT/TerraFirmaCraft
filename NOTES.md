@@ -294,3 +294,60 @@ Network construction in `RiverMouthResolver.buildChannels`, all jitter from
   keep normal behavior; outside masks everything is bit-identical as before.
 
 ---
+
+## Phase 5 — Surfaces + clay (v1 gameplay hook)
+
+Option A per impl plan §7: a mouth-aware wrapper around the biome's own surface
+builder, driven by per-column band data cached during the noise pass (§4.6 — no
+new terminal-edge search at the surface stage).
+
+- **`RiverMouthSurface`** (world.surface): pure band classifier + the wrapper.
+  Bands (impl plan §5.7): CHANNEL (bed/waterline), CHANNEL_MARGIN (levees of
+  channels ≥ 14 blocks wide — "gravel on strong channel margins"), WET_FLAT (the
+  low plain in [sea − 2, sea + 1.25] — silt/mud, the clay band), SHOAL (submerged
+  plain below sea − 2: pond bottoms and the sampler's deep-water build cap — mud,
+  never the clay gate; found by the band gate on the first run), RAISED_ISLAND
+  (> sea + 1.25 — native soil/grass, also the inland transition), OUTER_FRONT
+  (normalizedAlong < −0.55 and low — sand). Classified from the cached mouth sample + carved
+  height, so bands always agree with the terrain actually built. Band edges
+  mirror the DELTA sampler's distFac bands (×0.8, sans fuzz) and plain hypsometry.
+- **Plumbing:** `ChunkNoiseFiller` captures band + fan weight per column in
+  `updateLocalCaches` (16×16 arrays) → `TFCChunkGenerator` → `SurfaceManager`,
+  which swaps in the wrapper for in-fan columns. The wrapper dithers back to the
+  biome builder through the feathered mask edge (weight < 1), mirroring the
+  terrain blend. `SurfaceManager` seeds the mouth surface AFTER all biome
+  builders, so every surface outside a fan mask is bit-identical to before.
+- **Materials** are all climate-aware ladders (snow/arid ends included — nothing
+  hardcoded temperate): wet flats mix MUD with the new `SILTY_GRASS` (fluvisol
+  ladder → sand) by patch noise, pond bottoms get OCEAN_MUD; margins mix gravel
+  over the same; channel beds RIVER_SAND; outer front SAND; islands default
+  native grass ladder.
+- **Clay boost (locked v1 hook):** new placement modifier
+  `tfc:river_mouth_wet_flat` (classifies the position with the same
+  `RiverMouthSurface.classify`, via the resolver's cached sample) gates a new
+  `delta_clay_disc_with_indicator` placed feature — the stock clay disc states
+  (incl. mud→clay like the water disc) + the stock indicator plants — added to
+  the `#tfc:feature/soil_discs` tag every relevant biome already carries.
+  Ordinary clay: 1/20 chunks, groundwater-gated. Delta clay: **count 2 per chunk**
+  (the clearly-marked tunable rate, in the placed feature + world_gen.py),
+  wet-flat-gated only — reliable, not a lottery. Python datagen updated to match
+  the hand-written JSONs.
+- New automated gate (`testSurfaceBandsCoverFanAndAgreeWithTerrain`): NONE
+  outside every mask; all core bands present in-fan; per-band terrain agreement
+  (channels low, wet flats near sea, islands ≤ sea + 6 on the seaward plain —
+  "the delta reads LOW"); wet flats dominate islands ("most of the plain");
+  wet flats exist at weight ≥ 0.9 ⇒ the clay gate has targets.
+
+---
+
+## Human checklist (in-game, before PR)
+
+- [ ] Boat test: open ocean → upstream river through the dominant channel at 5+
+      deltas on a fixed seed; screenshots here.
+- [ ] Visual pass at 5+ deltas: bands read correctly (mud/silt flats, sandy
+      front, gravel margins, green islands), delta looks LOW (islands ≤ +3).
+- [ ] Clay reliably findable on wet flats (dig test + indicator plants visible);
+      tune the count-2 rate if it feels off.
+- [ ] Cold-climate delta spot-check: frozen but recognizable (snow ladders on
+      flats/islands), nothing hardcoded temperate.
+- [ ] Performance sanity: chunk gen timing near mouths vs. master noise level.

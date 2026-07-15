@@ -51,6 +51,7 @@ import net.dries007.tfc.world.river.mouth.RiverMouthResolver;
 import net.dries007.tfc.world.river.mouth.RiverMouthSample;
 import net.dries007.tfc.world.settings.Settings;
 import net.dries007.tfc.world.shore.ShoreBlendType;
+import net.dries007.tfc.world.surface.RiverMouthSurface;
 import net.dries007.tfc.world.shore.ShoreNoiseSampler;
 import net.dries007.tfc.world.volcano.CenteredFeatureBlendType;
 import net.dries007.tfc.world.volcano.CenteredFeatureNoiseSampler;
@@ -375,6 +376,86 @@ public class DeltaWorldgenTest implements TestSetup
             }
         }
         assertTrue(overlaidShoreQuarts > 3, "Channel never crossed a .noRivers() biome: " + overlaidShoreQuarts);
+    }
+
+    @Test
+    public void testSurfaceBandsCoverFanAndAgreeWithTerrain()
+    {
+        // Phase 5: the surface band classifier must (a) stay NONE outside every fan mask, (b) produce all the
+        // core delta bands inside the fan, (c) agree with the carved terrain per band, and (d) keep the delta
+        // reading LOW - wet flats dominating the plain, islands never towering over the fan
+        final Fixture fixture = fixture();
+        final RiverMouthContext context = fixture.mouths.get(0).context();
+
+        final int anchorBlockX = (int) Math.round(context.anchorGridX() * Units.GRID_WIDTH_IN_BLOCK);
+        final int anchorBlockZ = (int) Math.round(context.anchorGridZ() * Units.GRID_WIDTH_IN_BLOCK);
+        final int radiusBlocks = 224, step = 4;
+        final int sea = TFCChunkGenerator.SEA_LEVEL_Y;
+
+        final int[] bandCounts = new int[RiverMouthSurface.Band.VALUES.length];
+
+        final int minChunkX = (anchorBlockX - radiusBlocks) >> 4, maxChunkX = (anchorBlockX + radiusBlocks) >> 4;
+        final int minChunkZ = (anchorBlockZ - radiusBlocks) >> 4, maxChunkZ = (anchorBlockZ + radiusBlocks) >> 4;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++)
+        {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++)
+            {
+                final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+                final ChunkHeightFiller filler = fixture.stack.createHeightFiller(pos, true);
+                for (int x = pos.getMinBlockX(); x <= pos.getMaxBlockX(); x += step)
+                {
+                    for (int z = pos.getMinBlockZ(); z <= pos.getMaxBlockZ(); z += step)
+                    {
+                        final double height = filler.sampleHeight(x, z);
+                        final RiverMouthSample sample = fixture.stack.sampleMouth(x, z);
+                        final RiverMouthSurface.Band band = RiverMouthSurface.classify(sample, height, sea);
+
+                        if (sample == null)
+                        {
+                            assertEquals(RiverMouthSurface.Band.NONE, band, "Band outside every fan mask at (" + x + ", " + z + ")");
+                            continue;
+                        }
+                        if (sample.terrainWeight() < 0.9)
+                        {
+                            continue; // Feathered boundary - the surface stage dithers here, no band guarantees
+                        }
+                        bandCounts[band.ordinal()]++;
+
+                        switch (band)
+                        {
+                            // Channel columns are carved to (or below) the waterline, modulo edge fuzz and levees
+                            case CHANNEL -> assertTrue(height <= sea + 3, "Channel band on high ground at (" + x + ", " + z + "): " + height);
+                            // Wet flats hug sea level; deeper submerged plain (pond bottoms, the deep-water
+                            // build cap) must classify as SHOAL so the clay gate never targets it
+                            case WET_FLAT -> assertTrue(height >= sea - RiverMouthSurface.WET_FLAT_MAX_DEPTH_BELOW_SEA,
+                                "Wet flat below the shoal boundary at (" + x + ", " + z + "): " + height);
+                            // The delta must read LOW: nothing on the seaward plain approaches ordinary land heights
+                            case RAISED_ISLAND ->
+                            {
+                                if (sample.normalizedAlong() < 0)
+                                {
+                                    assertTrue(height <= sea + 6, "Raised island towers over the seaward fan at (" + x + ", " + z + "): " + height);
+                                }
+                            }
+                            // By construction seaward and low - just prove the constructor holds
+                            case OUTER_FRONT -> assertTrue(sample.normalizedAlong() < RiverMouthSurface.OUTER_FRONT_NORMALIZED_ALONG,
+                                "Outer front inland of its band boundary at (" + x + ", " + z + ")");
+                            default -> {}
+                        }
+                    }
+                }
+            }
+        }
+
+        assertTrue(bandCounts[RiverMouthSurface.Band.CHANNEL.ordinal()] > 0, "No channel band columns found");
+        assertTrue(bandCounts[RiverMouthSurface.Band.WET_FLAT.ordinal()] > 0, "No wet flat columns found - the clay band (and its placement gate) has no home");
+        assertTrue(bandCounts[RiverMouthSurface.Band.RAISED_ISLAND.ordinal()] > 0, "No raised island columns found");
+        assertTrue(bandCounts[RiverMouthSurface.Band.OUTER_FRONT.ordinal()] > 0, "No outer front columns found");
+
+        // "Most of the plain is wet flats and shallow ponds": wet flats must dominate raised islands
+        final int wetFlats = bandCounts[RiverMouthSurface.Band.WET_FLAT.ordinal()];
+        final int islands = bandCounts[RiverMouthSurface.Band.RAISED_ISLAND.ordinal()];
+        assertTrue(wetFlats > islands, "Wet flats (" + wetFlats + ") do not dominate raised islands (" + islands + ")");
     }
 
     @Test

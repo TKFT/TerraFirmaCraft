@@ -1,0 +1,107 @@
+{
+  "__comment__": "This file was automatically created by mcresources",
+  "type": "tfc:soil_disc",
+  "config": {
+    "min_radius": 3,
+    "max_radius": 5,
+    "height": 3,
+    "states": [
+      {
+        "replace": "tfc:dirt/entisol",
+        "with": "tfc:clay/entisol"
+      },
+      {
+        "replace": "tfc:dirt/aridisol",
+        "with": "tfc:clay/aridisol"
+      },
+      {
+        "replace": "tfc:dirt/oxisol",
+        "with": "tfc:clay/oxisol"
+      },
+      {
+        "replace": "tfc:dirt/fluvisol",
+        "with": "tfc:clay/fluvisol"
+      },
+      {
+        "replace": "tfc:dirt/andisol",
+        "with": "tfc:clay/andisol"
+      },
+      {
+        "replace": "tfc:dirt/podzol",
+        "with": "tfc:clay/podzol"
+      },
+      {
+        "replace": "tfc:dirt/alfisol",
+        "with": "tfc:clay/alfisol"
+      },
+      {
+        "replace": "tfc:dirt/mollisol",
+        "with": "tfc:clay/mollisol"
+      },
+      {
+        "replace": "tfc:grass/entisol",
+        "with": "tfc:clay_grass/entisol"
+      },
+      {
+        "replace": "tfc:grass/aridisol",
+        "with": "tfc:clay_grass/aridisol"
+      },
+      {
+        "replace": "tfc:grass/oxisol",
+        "with": "tfc:clay_grass/oxisol"
+      },
+      {
+        "replace": "tfc:grass/fluvisol",
+        "with": "tfc:clay_grass/fluvisol"
+      },
+      {
+        "replace": "tfc:grass/andisol",
+        "with": "tfc:clay_grass/andisol"
+      },
+      {
+        "replace": "tfc:grass/podzol",
+        "with": "tfc:clay_grass/podzol"
+      },
+      {
+        "replace": "tfc:grass/alfisol",
+        "with": "tfc:clay_grass/alfisol"
+      },
+      {
+        "replace": "tfc:grass/mollisol",
+        "with": "tfc:clay_grass/mollisol"
+      },
+      {
+        "replace": "tfc:mud/entisol",
+        "with": "tfc:clay/entisol"
+      },
+      {
+        "replace": "tfc:mud/aridisol",
+        "with": "tfc:clay/aridisol"
+      },
+      {
+        "replace": "tfc:mud/oxisol",
+        "with": "tfc:clay/oxisol"
+      },
+      {
+        "replace": "tfc:mud/fluvisol",
+        "with": "tfc:clay/fluvisol"
+      },
+      {
+        "replace": "tfc:mud/andisol",
+        "with": "tfc:clay/andisol"
+      },
+      {
+        "replace": "tfc:mud/podzol",
+        "with": "tfc:clay/podzol"
+      },
+      {
+        "replace": "tfc:mud/alfisol",
+        "with": "tfc:clay/alfisol"
+      },
+      {
+        "replace": "tfc:mud/mollisol",
+        "with": "tfc:clay/mollisol"
+      }
+    ]
+  }
+}
